@@ -26,14 +26,13 @@ AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 LDADD = \
   libver.a \
   ../lib/libdiffutils.a \
-  $(LIBCSTACK) \
-  $(LIBINTL) \
-  $(LIBICONV) \
-  $(LIBSIGSEGV) \
-  $(LIBTHREAD) \
-  $(LIBUNISTRING) \
   $(CLOCK_TIME_LIB) \
   $(HARD_LOCALE_LIB) \
+  $(LIBTHREAD) \
+  $(LIBCSTACK) \
+  $(LIBINTL) \
+  $(LIBSIGSEGV) \
+  $(LIBUNISTRING) \
   $(MBRTOWC_LIB) \
   $(SETLOCALE_NULL_LIB)
 
@@ -48,10 +47,7 @@ sdiff_SOURCES = sdiff.c
 diff_SOURCES = \
   analyze.c context.c diff.c dir.c ed.c ifdef.c io.c \
   normal.c side.c util.c
-noinst_HEADERS =	\
-  die.h			\
-  diff.h		\
-  system.h
+noinst_HEADERS = diff.h system.h
 
 MOSTLYCLEANFILES = paths.h paths.ht
 

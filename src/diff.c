@@ -21,7 +21,6 @@
 #define GDIFF_MAIN
 #define SYSTEM_INLINE _GL_EXTERN_INLINE
 #include "diff.h"
-#include "die.h"
 #include <assert.h>
 #include "paths.h"
 #include <c-stack.h>
@@ -48,11 +47,11 @@
 static char const PROGRAM_NAME[] = "diff";
 
 #define AUTHORS \
-  proper_name ("Paul Eggert"), \
-  proper_name ("Mike Haertel"), \
-  proper_name ("David Hayes"), \
-  proper_name ("Richard Stallman"), \
-  proper_name ("Len Tower")
+  _("Paul Eggert"), \
+  _("Mike Haertel"), \
+  _("David Hayes"), \
+  _("Richard Stallman"), \
+  _("Len Tower")
 
 #ifndef GUTTER_WIDTH_MINIMUM
 # define GUTTER_WIDTH_MINIMUM 3
@@ -109,9 +108,6 @@ static bool report_identical_files;
 /* Do not treat directories specially.  */
 static bool no_directory;
 
-static char const shortopts[] =
-"0123456789abBcC:dD:eEfF:hHiI:lL:nNpPqrsS:tTuU:vwW:x:X:yZ";
-
 /* Values for long options that do not have single-letter equivalents.  */
 enum
 {
@@ -166,6 +162,8 @@ static char const line_format_option[][sizeof "--unchanged-line-format"] =
     "--new-line-format"
   };
 
+static char const shortopts[] =
+  "0123456789abBcC:dD:eEfF:hHiI:lL:nNpPqrsS:tTuU:vwW:x:X:yZ";
 static struct option const longopts[] =
 {
   {"binary", 0, 0, BINARY_OPTION},
@@ -288,7 +286,7 @@ main (int argc, char **argv)
   setlocale (LC_ALL, "");
   bindtextdomain (PACKAGE, LOCALEDIR);
   textdomain (PACKAGE);
-  c_stack_action (0);
+  c_stack_action (nullptr);
   function_regexp_list.buf = &function_regexp;
   ignore_regexp_list.buf = &ignore_regexp;
   re_set_syntax (RE_SYNTAX_GREP | RE_NO_POSIX_BACKTRACKING);
@@ -296,9 +294,8 @@ main (int argc, char **argv)
   presume_output_tty = false;
   xstdopen ();
 
-  /* Decode the options.  */
+  /* Parse command line options.  */
 
-  int prev = -1;
   lin ocontext = -1;
   bool explicit_context = false;
   intmax_t width = 0;
@@ -306,416 +303,411 @@ main (int argc, char **argv)
   char const *from_file = nullptr;
   char const *to_file = nullptr;
 
-  for (int c;
-       (c = getopt_long (argc, argv, shortopts, longopts, nullptr)) != -1; )
-    {
-      switch (c)
-        {
-        case 0:
-          break;
+  for (int prev = -1, c;
+       0 <= (c = getopt_long (argc, argv, shortopts, longopts, nullptr));
+       prev = c)
+    switch (c)
+      {
+      case 0:
+	break;
 
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          ocontext = (! ISDIGIT (prev)
-                      ? c - '0'
-                      : (ocontext - (c - '0' <= CONTEXT_MAX % 10)
-                         < CONTEXT_MAX / 10)
-                      ? 10 * ocontext + (c - '0')
-                      : CONTEXT_MAX);
-          break;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+	if (! ISDIGIT (prev))
+	  ocontext = 0;
+	if (ckd_mul (&ocontext, ocontext, 10)
+	    || ckd_add (&ocontext, ocontext, c - '0'))
+	  ocontext = LIN_MAX;
+	break;
 
-        case 'a':
-          text = true;
-          break;
+      case 'a':
+	text = true;
+	break;
 
-        case 'b':
-          if (ignore_white_space < IGNORE_SPACE_CHANGE)
-            ignore_white_space = IGNORE_SPACE_CHANGE;
-          break;
+      case 'b':
+	if (ignore_white_space < IGNORE_SPACE_CHANGE)
+	  ignore_white_space = IGNORE_SPACE_CHANGE;
+	break;
 
-        case 'Z':
-          if (ignore_white_space < IGNORE_SPACE_CHANGE)
-            ignore_white_space |= IGNORE_TRAILING_SPACE;
-          break;
+      case 'Z':
+	if (ignore_white_space < IGNORE_SPACE_CHANGE)
+	  ignore_white_space |= IGNORE_TRAILING_SPACE;
+	break;
 
-        case 'B':
-          ignore_blank_lines = true;
-          break;
+      case 'B':
+	ignore_blank_lines = true;
+	break;
 
-        case 'C':
-        case 'U':
-          {
-	    intmax_t numval;
+      case 'C':
+      case 'U':
+	{
+	  intmax_t numval;
 
-            if (optarg)
-              {
-		char *numend;
-		numval = strtoimax (optarg, &numend, 10);
-                if (*numend || numval < 0)
-                  try_help ("invalid context length '%s'", optarg);
-                if (CONTEXT_MAX < numval)
-                  numval = CONTEXT_MAX;
-              }
-            else
-              numval = 3;
+	  if (optarg)
+	    {
+	      char *numend;
+	      numval = strtoimax (optarg, &numend, 10);
+	      if (*numend || numval < 0)
+		try_help ("invalid context length '%s'", optarg);
+	    }
+	  else
+	    numval = 3;
 
-            specify_style (c == 'U' ? OUTPUT_UNIFIED : OUTPUT_CONTEXT);
-            if (context < numval)
-              context = numval;
-            explicit_context = true;
-          }
-          break;
+	  specify_style (c == 'U' ? OUTPUT_UNIFIED : OUTPUT_CONTEXT);
+	  if (context < numval)
+	    context = MIN (numval, LIN_MAX);
+	  explicit_context = true;
+	}
+	break;
 
-        case 'c':
-          specify_style (OUTPUT_CONTEXT);
-          if (context < 3)
-            context = 3;
-          break;
+      case 'c':
+	specify_style (OUTPUT_CONTEXT);
+	if (context < 3)
+	  context = 3;
+	break;
 
-        case 'd':
-          minimal = true;
-          break;
+      case 'd':
+	minimal = true;
+	break;
 
-        case 'D':
-          specify_style (OUTPUT_IFDEF);
-          {
-	    static char const C_ifdef_group_formats[]
-	      = (/* UNCHANGED */
-		 "%="
-		 "\0"
+      case 'D':
+	specify_style (OUTPUT_IFDEF);
+	{
+	  static char const C_ifdef_group_formats[]
+	    = (/* UNCHANGED */
+	       "%="
+	       "\0"
 
-		 /* OLD */
-		 "#ifndef @\n"
-		 "%<"
-		 "#endif /* ! @ */\n"
-		 "\0"
+	       /* OLD */
+	       "#ifndef @\n"
+	       "%<"
+	       "#endif /* ! @ */\n"
+	       "\0"
 
-		 /* NEW */
-		 "#ifdef @\n"
-		 "%>"
-		 "#endif /* @ */\n"
-		 "\0"
+	       /* NEW */
+	       "#ifdef @\n"
+	       "%>"
+	       "#endif /* @ */\n"
+	       "\0"
 
-		 /* CHANGED */
-		 "#ifndef @\n"
-		 "%<"
-		 "#else /* @ */\n"
-		 "%>"
-		 "#endif /* @ */\n");
-	    int nats = 7; /* 7 "@"s are in C_ifdef_group_formats.  */
+	       /* CHANGED */
+	       "#ifndef @\n"
+	       "%<"
+	       "#else /* @ */\n"
+	       "%>"
+	       "#endif /* @ */\n");
+	  int nats = 7; /* 7 "@"s are in C_ifdef_group_formats.  */
 
-	    char *b = xinmalloc (((sizeof C_ifdef_group_formats + 1) / nats
-				  + strlen (optarg)),
-				 nats);
-	    char *base = b;
-	    int changes = 0;
+	  char *b = xinmalloc (((sizeof C_ifdef_group_formats + 1) / nats
+				+ strlen (optarg)),
+			       nats);
+	  char *base = b;
+	  int changes = 0;
 
-	    for (int i = 0; i < sizeof C_ifdef_group_formats; i++)
-	      {
-		char ch = C_ifdef_group_formats[i];
-		switch (ch)
-		  {
-		  default:
-		    *b++ = ch;
-		    break;
+	  for (int i = 0; i < sizeof C_ifdef_group_formats; i++)
+	    {
+	      char ch = C_ifdef_group_formats[i];
+	      switch (ch)
+		{
+		default:
+		  *b++ = ch;
+		  break;
 
-		  case '@':
-		    b = stpcpy (b, optarg);
-		    break;
+		case '@':
+		  b = stpcpy (b, optarg);
+		  break;
 
-		  case '\0':
-		    *b++ = ch;
-		    specify_value (&group_format[changes++], base, "-D");
-		    base = b;
-		    break;
-		  }
-	      }
-          }
-          break;
+		case '\0':
+		  *b++ = ch;
+		  specify_value (&group_format[changes++], base, "-D");
+		  base = b;
+		  break;
+		}
+	    }
+	}
+	break;
 
-        case 'e':
-          specify_style (OUTPUT_ED);
-          break;
+      case 'e':
+	specify_style (OUTPUT_ED);
+	break;
 
-        case 'E':
-          if (ignore_white_space < IGNORE_SPACE_CHANGE)
-            ignore_white_space |= IGNORE_TAB_EXPANSION;
-          break;
+      case 'E':
+	if (ignore_white_space < IGNORE_SPACE_CHANGE)
+	  ignore_white_space |= IGNORE_TAB_EXPANSION;
+	break;
 
-        case 'f':
-          specify_style (OUTPUT_FORWARD_ED);
-          break;
+      case 'f':
+	specify_style (OUTPUT_FORWARD_ED);
+	break;
 
-        case 'F':
-          add_regexp (&function_regexp_list, optarg);
-          break;
+      case 'F':
+	add_regexp (&function_regexp_list, optarg);
+	break;
 
-        case 'h':
-          /* Split the files into chunks for faster processing.
-             Usually does not change the result.
+      case 'h':
+	/* Split the files into chunks for faster processing.
+	   Usually does not change the result.
 
-             This currently has no effect.  */
-          break;
+	   This currently has no effect.  */
+	break;
 
-        case 'H':
-          speed_large_files = true;
-          break;
+      case 'H':
+	speed_large_files = true;
+	break;
 
-        case 'i':
-          ignore_case = true;
-          break;
+      case 'i':
+	ignore_case = true;
+	break;
 
-        case 'I':
-          add_regexp (&ignore_regexp_list, optarg);
-          break;
+      case 'I':
+	add_regexp (&ignore_regexp_list, optarg);
+	break;
 
-        case 'l':
-          if (!pr_program[0])
-            try_help ("pagination not supported on this host", nullptr);
-          paginate = true;
+      case 'l':
+	if (!pr_program[0])
+	  try_help ("pagination not supported on this host", nullptr);
+	paginate = true;
 #ifdef SIGCHLD
-          /* Pagination requires forking and waiting, and
-             System V fork+wait does not work if SIGCHLD is ignored.  */
-          signal (SIGCHLD, SIG_DFL);
+	/* Pagination requires forking and waiting, and
+	   System V fork+wait does not work if SIGCHLD is ignored.  */
+	signal (SIGCHLD, SIG_DFL);
 #endif
-          break;
+	break;
 
-        case 'L':
-          if (!file_label[0])
-            file_label[0] = optarg;
-          else if (!file_label[1])
-            file_label[1] = optarg;
-          else
-            fatal ("too many file label options");
-          break;
+      case 'L':
+	if (!file_label[0])
+	  file_label[0] = optarg;
+	else if (!file_label[1])
+	  file_label[1] = optarg;
+	else
+	  fatal ("too many file label options");
+	break;
 
-        case 'n':
-          specify_style (OUTPUT_RCS);
-          break;
+      case 'n':
+	specify_style (OUTPUT_RCS);
+	break;
 
-        case 'N':
-          new_file = true;
-          break;
+      case 'N':
+	new_file = true;
+	break;
 
-        case 'p':
-          show_c_function = true;
-          add_regexp (&function_regexp_list, "^[[:alpha:]$_]");
-          break;
+      case 'p':
+	show_c_function = true;
+	add_regexp (&function_regexp_list, "^[[:alpha:]$_]");
+	break;
 
-        case 'P':
-          unidirectional_new_file = true;
-          break;
+      case 'P':
+	unidirectional_new_file = true;
+	break;
 
-        case 'q':
-          brief = true;
-          break;
+      case 'q':
+	brief = true;
+	break;
 
-        case 'r':
-          recursive = true;
-          break;
+      case 'r':
+	recursive = true;
+	break;
 
-        case 's':
-          report_identical_files = true;
-          break;
+      case 's':
+	report_identical_files = true;
+	break;
 
-        case 'S':
-          specify_value (&starting_file, optarg, "-S");
-          break;
+      case 'S':
+	specify_value (&starting_file, optarg, "-S");
+	break;
 
-        case 't':
-          expand_tabs = true;
-          break;
+      case 't':
+	expand_tabs = true;
+	break;
 
-        case 'T':
-          initial_tab = true;
-          break;
+      case 'T':
+	initial_tab = true;
+	break;
 
-        case 'u':
-          specify_style (OUTPUT_UNIFIED);
-          if (context < 3)
-            context = 3;
-          break;
+      case 'u':
+	specify_style (OUTPUT_UNIFIED);
+	if (context < 3)
+	  context = 3;
+	break;
 
-        case 'v':
-          version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version,
-                       AUTHORS, nullptr);
-          check_stdout ();
-          return EXIT_SUCCESS;
+      case 'v':
+	version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version,
+		     AUTHORS, nullptr);
+	check_stdout ();
+	return EXIT_SUCCESS;
 
-        case 'w':
-          ignore_white_space = IGNORE_ALL_SPACE;
-          break;
+      case 'w':
+	ignore_white_space = IGNORE_ALL_SPACE;
+	break;
 
-        case 'x':
-          add_exclude (excluded, optarg, exclude_options ());
-          break;
+      case 'x':
+	add_exclude (excluded, optarg, exclude_options ());
+	break;
 
-        case 'X':
-          if (add_exclude_file (add_exclude, excluded, optarg,
-                                exclude_options (), '\n'))
-            pfatal_with_name (optarg);
-          break;
+      case 'X':
+	if (add_exclude_file (add_exclude, excluded, optarg,
+			      exclude_options (), '\n'))
+	  pfatal_with_name (optarg);
+	break;
 
-        case 'y':
-          specify_style (OUTPUT_SDIFF);
-          break;
+      case 'y':
+	specify_style (OUTPUT_SDIFF);
+	break;
 
-        case 'W':
-	  {
-	    char *numend;
-	    intmax_t numval = strtoimax (optarg, &numend, 10);
-	    if (numval <= 0 || *numend)
-	      try_help ("invalid width '%s'", optarg);
-	    if (width != numval)
-	      {
-		if (width)
-		  fatal ("conflicting width options");
-		width = numval;
-	      }
-	  }
-          break;
+      case 'W':
+	{
+	  char *numend;
+	  intmax_t numval = strtoimax (optarg, &numend, 10);
+	  if (numval <= 0 || *numend)
+	    try_help ("invalid width '%s'", optarg);
+	  if (width != numval)
+	    {
+	      if (width)
+		fatal ("conflicting width options");
+	      width = numval;
+	    }
+	}
+	break;
 
-        case BINARY_OPTION:
+      case BINARY_OPTION:
 #if O_BINARY
-          binary = true;
-          if (! isatty (STDOUT_FILENO))
-            set_binary_mode (STDOUT_FILENO, O_BINARY);
+	binary = true;
+	if (! isatty (STDOUT_FILENO))
+	  set_binary_mode (STDOUT_FILENO, O_BINARY);
 #endif
-          break;
+	break;
 
-        case FROM_FILE_OPTION:
-          specify_value (&from_file, optarg, "--from-file");
-          break;
+      case FROM_FILE_OPTION:
+	specify_value (&from_file, optarg, "--from-file");
+	break;
 
-        case HELP_OPTION:
-          usage ();
-          check_stdout ();
-          return EXIT_SUCCESS;
+      case HELP_OPTION:
+	usage ();
+	check_stdout ();
+	return EXIT_SUCCESS;
 
-        case HORIZON_LINES_OPTION:
-	  {
-	    char *numend;
-	    intmax_t numval = strtoimax (optarg, &numend, 10);
-	    if (*numend || numval < 0)
-	      try_help ("invalid horizon length '%s'", optarg);
-	    horizon_lines = MAX (horizon_lines, MIN (numval, LIN_MAX));
-	  }
-          break;
+      case HORIZON_LINES_OPTION:
+	{
+	  char *numend;
+	  intmax_t numval = strtoimax (optarg, &numend, 10);
+	  if (*numend || numval < 0)
+	    try_help ("invalid horizon length '%s'", optarg);
+	  horizon_lines = MAX (horizon_lines, MIN (numval, LIN_MAX));
+	}
+	break;
 
-        case IGNORE_FILE_NAME_CASE_OPTION:
-          ignore_file_name_case = true;
-          break;
+      case IGNORE_FILE_NAME_CASE_OPTION:
+	ignore_file_name_case = true;
+	break;
 
-        case INHIBIT_HUNK_MERGE_OPTION:
-          /* This option is obsolete, but accept it for backward
-             compatibility.  */
-          break;
+      case INHIBIT_HUNK_MERGE_OPTION:
+	/* This option is obsolete, but accept it for backward
+	   compatibility.  */
+	break;
 
-        case LEFT_COLUMN_OPTION:
-          left_column = true;
-          break;
+      case LEFT_COLUMN_OPTION:
+	left_column = true;
+	break;
 
-        case LINE_FORMAT_OPTION:
-          specify_style (OUTPUT_IFDEF);
-          for (int i = 0; i < sizeof line_format / sizeof line_format[0]; i++)
-            specify_value (&line_format[i], optarg, "--line-format");
-          break;
+      case LINE_FORMAT_OPTION:
+	specify_style (OUTPUT_IFDEF);
+	for (int i = 0; i < sizeof line_format / sizeof line_format[0]; i++)
+	  specify_value (&line_format[i], optarg, "--line-format");
+	break;
 
-        case NO_DEREFERENCE_OPTION:
-          no_dereference_symlinks = true;
-          break;
+      case NO_DEREFERENCE_OPTION:
+	no_dereference_symlinks = true;
+	break;
 
-        case NO_IGNORE_FILE_NAME_CASE_OPTION:
-          ignore_file_name_case = false;
-          break;
+      case NO_IGNORE_FILE_NAME_CASE_OPTION:
+	ignore_file_name_case = false;
+	break;
 
-        case NORMAL_OPTION:
-          specify_style (OUTPUT_NORMAL);
-          break;
+      case NORMAL_OPTION:
+	specify_style (OUTPUT_NORMAL);
+	break;
 
-        case SDIFF_MERGE_ASSIST_OPTION:
-          specify_style (OUTPUT_SDIFF);
-          sdiff_merge_assist = true;
-          break;
+      case SDIFF_MERGE_ASSIST_OPTION:
+	specify_style (OUTPUT_SDIFF);
+	sdiff_merge_assist = true;
+	break;
 
-        case STRIP_TRAILING_CR_OPTION:
-          strip_trailing_cr = true;
-          break;
+      case STRIP_TRAILING_CR_OPTION:
+	strip_trailing_cr = true;
+	break;
 
-        case SUPPRESS_BLANK_EMPTY_OPTION:
-          suppress_blank_empty = true;
-          break;
+      case SUPPRESS_BLANK_EMPTY_OPTION:
+	suppress_blank_empty = true;
+	break;
 
-        case SUPPRESS_COMMON_LINES_OPTION:
-          suppress_common_lines = true;
-          break;
+      case SUPPRESS_COMMON_LINES_OPTION:
+	suppress_common_lines = true;
+	break;
 
-        case TABSIZE_OPTION:
-	  {
-	    char *numend;
-	    intmax_t numval = strtoimax (optarg, &numend, 10);
-	    if (! (0 < numval && numval <= INTMAX_MAX - GUTTER_WIDTH_MINIMUM)
-		|| *numend)
-	      try_help ("invalid tabsize '%s'", optarg);
-	    if (tabsize != numval)
-	      {
-		if (tabsize)
-		  fatal ("conflicting tabsize options");
-		tabsize = numval;
-	      }
-	  }
-          break;
+      case TABSIZE_OPTION:
+	{
+	  char *numend;
+	  intmax_t numval = strtoimax (optarg, &numend, 10);
+	  if (! (0 < numval && numval <= INTMAX_MAX - GUTTER_WIDTH_MINIMUM)
+	      || *numend)
+	    try_help ("invalid tabsize '%s'", optarg);
+	  if (tabsize != numval)
+	    {
+	      if (tabsize)
+		fatal ("conflicting tabsize options");
+	      tabsize = numval;
+	    }
+	}
+	break;
 
-        case TO_FILE_OPTION:
-          specify_value (&to_file, optarg, "--to-file");
-          break;
+      case TO_FILE_OPTION:
+	specify_value (&to_file, optarg, "--to-file");
+	break;
 
-        case UNCHANGED_LINE_FORMAT_OPTION:
-        case OLD_LINE_FORMAT_OPTION:
-        case NEW_LINE_FORMAT_OPTION:
-          specify_style (OUTPUT_IFDEF);
-          c -= UNCHANGED_LINE_FORMAT_OPTION;
-          specify_value (&line_format[c], optarg, line_format_option[c]);
-          break;
+      case UNCHANGED_LINE_FORMAT_OPTION:
+      case OLD_LINE_FORMAT_OPTION:
+      case NEW_LINE_FORMAT_OPTION:
+	specify_style (OUTPUT_IFDEF);
+	c -= UNCHANGED_LINE_FORMAT_OPTION;
+	specify_value (&line_format[c], optarg, line_format_option[c]);
+	break;
 
-        case UNCHANGED_GROUP_FORMAT_OPTION:
-        case OLD_GROUP_FORMAT_OPTION:
-        case NEW_GROUP_FORMAT_OPTION:
-        case CHANGED_GROUP_FORMAT_OPTION:
-          specify_style (OUTPUT_IFDEF);
-          c -= UNCHANGED_GROUP_FORMAT_OPTION;
-          specify_value (&group_format[c], optarg, group_format_option[c]);
-          break;
+      case UNCHANGED_GROUP_FORMAT_OPTION:
+      case OLD_GROUP_FORMAT_OPTION:
+      case NEW_GROUP_FORMAT_OPTION:
+      case CHANGED_GROUP_FORMAT_OPTION:
+	specify_style (OUTPUT_IFDEF);
+	c -= UNCHANGED_GROUP_FORMAT_OPTION;
+	specify_value (&group_format[c], optarg, group_format_option[c]);
+	break;
 
-        case COLOR_OPTION:
-          specify_colors_style (optarg);
-          break;
+      case COLOR_OPTION:
+	specify_colors_style (optarg);
+	break;
 
-        case COLOR_PALETTE_OPTION:
-          set_color_palette (optarg);
-          break;
+      case COLOR_PALETTE_OPTION:
+	set_color_palette (optarg);
+	break;
 
-        case NO_DIRECTORY_OPTION:
-          no_directory = true;
-          break;
+      case NO_DIRECTORY_OPTION:
+	no_directory = true;
+	break;
 
-        case PRESUME_OUTPUT_TTY_OPTION:
-          presume_output_tty = true;
-          break;
+      case PRESUME_OUTPUT_TTY_OPTION:
+	presume_output_tty = true;
+	break;
 
-        default:
-          try_help (nullptr, nullptr);
-        }
-      prev = c;
-    }
+      default:
+	try_help (nullptr, nullptr);
+      }
 
   if (colors_style == AUTO)
     {
@@ -922,7 +914,7 @@ summarize_regexp_list (struct regexp_list *reglist)
           char const *m = re_compile_pattern (reglist->regexps, reglist->len,
                                               reglist->buf);
           if (m)
-            die (EXIT_TROUBLE, 0, "%s: %s", reglist->regexps, m);
+            error (EXIT_TROUBLE, 0, "%s: %s", reglist->regexps, m);
         }
     }
 }
@@ -932,7 +924,7 @@ try_help (char const *reason_msgid, char const *operand)
 {
   if (reason_msgid)
     error (0, 0, _(reason_msgid), operand);
-  die (EXIT_TROUBLE, 0, _("Try '%s --help' for more information."),
+  error (EXIT_TROUBLE, 0, _("Try '%s --help' for more information."),
          program_name);
 }
 
@@ -1041,7 +1033,7 @@ static char const *const option_help_msgid[] = {
   N_("If --from-file or --to-file is given, there are no restrictions on FILE(s)."),
   N_("If a FILE is '-', read standard input."),
   N_("Exit status is 0 if inputs are the same, 1 if different, 2 if trouble."),
-  0
+  nullptr
 };
 
 static void

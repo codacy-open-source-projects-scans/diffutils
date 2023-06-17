@@ -97,7 +97,7 @@ print_ifdef_hunk (struct change *hunk)
 static void
 format_ifdef (char const *format, lin beg0, lin end0, lin beg1, lin end1)
 {
-  format_group (outfile, format, 0,
+  format_group (outfile, format, '\0',
 		((struct group const[])
 		 {{.file = &files[0], .from = beg0, .upto = end0},
 		  {.file = &files[1], .from = beg1, .upto = end1}}));
@@ -115,7 +115,7 @@ format_group (FILE *out, char const *format, char endchar,
 {
   char const *f = format;
 
-  for (char c; (c = *f) != endchar && c != 0; )
+  for (char c; (c = *f) != endchar && c; )
     {
       char const *f1 = ++f;
       if (c == '%')
@@ -180,7 +180,7 @@ format_group (FILE *out, char const *format, char endchar,
             continue;
 
           default:
-            f = do_printf_spec (out, f - 2, 0, 0, groups);
+            f = do_printf_spec (out, f - 2, nullptr, 0, groups);
             if (f)
               continue;
             /* Fall through. */
@@ -258,7 +258,7 @@ print_ifdef_lines (FILE *out, char const *format,
       char c;
       char const *f = format;
 
-      while ((c = *f++) != 0)
+      while ((c = *f++))
         {
           char const *f1 = f;
           if (c == '%')
@@ -271,15 +271,16 @@ print_ifdef_lines (FILE *out, char const *format,
                 output_1_line (linbuf[from],
                                (linbuf[from + 1]
                                 - (linbuf[from + 1][-1] == '\n')),
-                               0, 0);
+                               nullptr, nullptr);
                 continue;
 
               case 'L':
-                output_1_line (linbuf[from], linbuf[from + 1], 0, 0);
+                output_1_line (linbuf[from], linbuf[from + 1],
+			       nullptr, nullptr);
                 continue;
 
               default:
-                f = do_printf_spec (out, f - 2, file, from, 0);
+                f = do_printf_spec (out, f - 2, file, from, nullptr);
                 if (f)
                   continue;
                 c = '%';
@@ -316,13 +317,13 @@ do_printf_spec (FILE *out, char const *spec,
     {
     case 'c':
       if (c1 != '\'')
-        return 0;
+        return nullptr;
       else
         {
           char value;
           f = scan_char_literal (f, &value);
           if (!f)
-            return 0;
+            return nullptr;
           if (out)
             putc (value, out);
         }
@@ -335,14 +336,14 @@ do_printf_spec (FILE *out, char const *spec,
         if (file)
           {
             if (c1 != 'n')
-              return 0;
+              return nullptr;
             value = translate_line_number (file, n);
           }
         else
           {
             value = groups_letter_value (groups, c1);
             if (value < 0)
-              return 0;
+              return nullptr;
           }
 
         if (out)
@@ -363,7 +364,7 @@ do_printf_spec (FILE *out, char const *spec,
       break;
 
     default:
-      return 0;
+      return nullptr;
     }
 
   return f;
@@ -387,7 +388,7 @@ scan_char_literal (char const *lit, char *valptr)
         return nullptr;
 
       case '\\':
-        value = 0;
+        value = '\0';
         while ((c = *p++) != '\'')
           {
             unsigned int digit = c - '0';

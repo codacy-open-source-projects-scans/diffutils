@@ -24,7 +24,6 @@
 
 #include <c-stack.h>
 #include <cmpbuf.h>
-#include "die.h"
 #include <error.h>
 #include <exitfail.h>
 #include <file-type.h>
@@ -43,8 +42,8 @@
 static char const PROGRAM_NAME[] = "cmp";
 
 #define AUTHORS \
-  proper_name_utf8 ("Torbjorn Granlund", "Torbj\303\266rn Granlund"), \
-  proper_name ("David MacKenzie")
+  proper_name_lite ("Torbjorn Granlund", "Torbj\303\266rn Granlund"), \
+  _("David MacKenzie")
 
 static bool
 hard_locale_LC_MESSAGES (void)
@@ -102,7 +101,8 @@ enum
   HELP_OPTION = CHAR_MAX + 1
 };
 
-static struct option const long_options[] =
+static char const shortopts[] = "bci:ln:sv";
+static struct option const longopts[] =
 {
   {"print-bytes", 0, 0, 'b'},
   {"print-chars", 0, 0, 'c'}, /* obsolescent as of diffutils 2.7.3 */
@@ -121,7 +121,7 @@ try_help (char const *reason_msgid, char const *operand)
 {
   if (reason_msgid)
     error (0, 0, _(reason_msgid), operand);
-  die (EXIT_TROUBLE, 0,
+  error (EXIT_TROUBLE, 0,
          _("Try '%s --help' for more information."), program_name);
 }
 
@@ -150,7 +150,7 @@ static void
 specify_comparison_type (enum comparison_type t)
 {
   if (comparison_type && comparison_type != t)
-    try_help ("options -l and -s are incompatible", 0);
+    try_help ("options -l and -s are incompatible", nullptr);
   comparison_type = t;
 }
 
@@ -158,9 +158,9 @@ static void
 check_stdout (void)
 {
   if (ferror (stdout))
-    die (EXIT_TROUBLE, 0, "%s", _("write failed"));
+    error (EXIT_TROUBLE, 0, "%s", _("write failed"));
   else if (fclose (stdout) != 0)
-    die (EXIT_TROUBLE, errno, "%s", _("standard output"));
+    error (EXIT_TROUBLE, errno, "%s", _("standard output"));
 }
 
 static char const *const option_help_msgid[] = {
@@ -173,7 +173,7 @@ static char const *const option_help_msgid[] = {
   N_("-s, --quiet, --silent      suppress all normal output"),
   N_("    --help                 display this help and exit"),
   N_("-v, --version              output version information and exit"),
-  0
+  nullptr
 };
 
 static void
@@ -209,14 +209,13 @@ main (int argc, char **argv)
   setlocale (LC_ALL, "");
   bindtextdomain (PACKAGE, LOCALEDIR);
   textdomain (PACKAGE);
-  c_stack_action (0);
+  c_stack_action (nullptr);
   xstdopen ();
 
   /* Parse command line options.  */
 
-  int c;
-  while ((c = getopt_long (argc, argv, "bci:ln:sv", long_options, 0))
-         != -1)
+  for (int c;
+       0 <= (c = getopt_long (argc, argv, shortopts, longopts, nullptr)); )
     switch (c)
       {
       case 'b':
@@ -239,7 +238,7 @@ main (int argc, char **argv)
       case 'n':
         {
           intmax_t n;
-          if (xstrtoimax (optarg, 0, 0, &n, valid_suffixes) != LONGINT_OK
+          if (xstrtoimax (optarg, nullptr, 0, &n, valid_suffixes) != LONGINT_OK
               || n < 0)
             try_help ("invalid --bytes value '%s'", optarg);
           if (! (0 <= bytes && bytes < n))
@@ -263,7 +262,7 @@ main (int argc, char **argv)
         return EXIT_SUCCESS;
 
       default:
-        try_help (0, 0);
+        try_help (nullptr, nullptr);
       }
 
   if (optind == argc)
@@ -376,7 +375,7 @@ main (int argc, char **argv)
 
   for (int f = 0; f < 2; f++)
     if (close (file_desc[f]) != 0)
-      die (EXIT_TROUBLE, errno, "%s", file[f]);
+      error (EXIT_TROUBLE, errno, "%s", file[f]);
   if (exit_status != EXIT_SUCCESS && comparison_type < type_no_stdout)
     check_stdout ();
   exit (exit_status);
@@ -426,7 +425,7 @@ cmp (void)
               if (r != bytes_to_read)
                 {
                   if (r < 0)
-                    die (EXIT_TROUBLE, errno, "%s", file[f]);
+                    error (EXIT_TROUBLE, errno, "%s", file[f]);
                   break;
                 }
               ig -= r;
@@ -453,10 +452,10 @@ cmp (void)
 
       ptrdiff_t read0 = block_read (file_desc[0], buf0, bytes_to_read);
       if (read0 < 0)
-        die (EXIT_TROUBLE, errno, "%s", file[0]);
+        error (EXIT_TROUBLE, errno, "%s", file[0]);
       ptrdiff_t read1 = block_read (file_desc[1], buf1, bytes_to_read);
       if (read1 < 0)
-        die (EXIT_TROUBLE, errno, "%s", file[1]);
+        error (EXIT_TROUBLE, errno, "%s", file[1]);
 
       idx_t smaller = MIN (read0, read1);
 

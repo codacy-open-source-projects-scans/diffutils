@@ -21,7 +21,6 @@
 #include "diff.h"
 
 #include <argmatch.h>
-#include <die.h>
 #include <dirname.h>
 #include <error.h>
 #include <flexmember.h>
@@ -88,7 +87,7 @@ pfatal_with_name (char const *name)
 {
   int e = errno;
   print_message_queue ();
-  die (EXIT_TROUBLE, e, "%s", name);
+  error (EXIT_TROUBLE, e, "%s", name);
 }
 
 /* Print an error message containing MSGID, then exit.  */
@@ -97,7 +96,7 @@ void
 fatal (char const *msgid)
 {
   print_message_queue ();
-  die (EXIT_TROUBLE, 0, "%s", _(msgid));
+  error (EXIT_TROUBLE, 0, "%s", _(msgid));
 }
 
 /* Like printf, except if -l in effect then save the message and print later.
@@ -140,7 +139,7 @@ message (char const *format_msgid, ...)
 	  }
 
       *msg_chain_end = new;
-      new->next = 0;
+      new->next = nullptr;
       msg_chain_end = &new->next;
     }
   else
@@ -814,7 +813,7 @@ setup_output (char const *name0, char const *name1, bool recursive)
   current_name0 = name0;
   current_name1 = name1;
   currently_recursive = recursive;
-  outfile = 0;
+  outfile = nullptr;
 }
 
 #if HAVE_WORKING_FORK
@@ -906,7 +905,7 @@ c_escape (char const *str)
 void
 begin_output (void)
 {
-  if (outfile != 0)
+  if (outfile)
     return;
 
   char *names[2] = {c_escape (current_name0), c_escape (current_name1)};
@@ -1017,7 +1016,7 @@ begin_output (void)
 void
 finish_output (void)
 {
-  if (outfile != 0 && outfile != stdout)
+  if (outfile && outfile != stdout)
     {
       int wstatus;
       int werrno = 0;
@@ -1037,7 +1036,7 @@ finish_output (void)
 		    ? WEXITSTATUS (wstatus)
 		    : INT_MAX);
       if (status)
-        die (EXIT_TROUBLE, werrno,
+        error (EXIT_TROUBLE, werrno,
                _(status == 126
                  ? "subsidiary program '%s' could not be invoked"
                  : status == 127
@@ -1048,7 +1047,7 @@ finish_output (void)
                pr_program, status);
     }
 
-  outfile = 0;
+  outfile = nullptr;
 }
 
 /* Compare two lines (typically one from each input file)
@@ -1064,7 +1063,7 @@ lines_differ (char const *s1, char const *s2)
   char const *t2 = s2;
   intmax_t tab = 0, column = 0;
 
-  while (1)
+  while (true)
     {
       unsigned char c1 = *t1++;
       unsigned char c2 = *t2++;
@@ -1269,7 +1268,7 @@ print_script (struct change *script,
       /* Disconnect them from the rest of the changes,
          making them a hunk, and remember the rest for next iteration.  */
       next = end->link;
-      end->link = 0;
+      end->link = nullptr;
 #ifdef DEBUG
       debug_script (this);
 #endif
@@ -1304,7 +1303,7 @@ print_1_line_nl (char const *line_flag, char const *const *line, bool skip_nl)
 {
   char const *base = line[0], *limit = line[1]; /* Help the compiler.  */
   FILE *out = outfile; /* Help the compiler some more.  */
-  char const *flag_format = 0;
+  char const *flag_format = nullptr;
 
   /* If -T was specified, use a Tab between the line-flag and the text.
      Otherwise use a Space (as Unix diff does).
@@ -1476,7 +1475,7 @@ set_color_context (enum color_context color_context)
 }
 
 
-char const change_letter[] = { 0, 'd', 'a', 'c' };
+char const change_letter[] = { '\0', 'd', 'a', 'c' };
 
 /* Translate an internal line number (an index into diff's table of lines)
    into an actual line number in the input file.
@@ -1585,8 +1584,9 @@ analyze_hunk (struct change *hunk,
                 }
           if (newline - p != trivial_length
               && (! ignore_regexp.fastmap
-                  || re_search (&ignore_regexp, line, len, 0, len, 0) < 0))
-            trivial = 0;
+                  || (re_search (&ignore_regexp, line, len, 0, len, nullptr)
+		      < 0)))
+            trivial = false;
         }
 
       for (lin i = next->line1; i <= l1 && trivial; i++)
@@ -1606,11 +1606,12 @@ analyze_hunk (struct change *hunk,
                 }
           if (newline - p != trivial_length
               && (! ignore_regexp.fastmap
-                  || re_search (&ignore_regexp, line, len, 0, len, 0) < 0))
-            trivial = 0;
+                  || (re_search (&ignore_regexp, line, len, 0, len, nullptr)
+		      < 0)))
+            trivial = false;
         }
     }
-  while ((next = next->link) != 0);
+  while ((next = next->link));
 
   *last0 = l0;
   *last1 = l1;

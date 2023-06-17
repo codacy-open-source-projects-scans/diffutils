@@ -20,7 +20,9 @@ AC_PREREQ([2.64])
 
 AC_INIT([GNU diffutils],
         m4_esyscmd([build-aux/git-version-gen .tarball-version]),
-        [bug-diffutils@gnu.org])
+        [bug-diffutils@gnu.org],
+	[diffutils],
+	[https://www.gnu.org/software/diffutils/])
 
 AC_CONFIG_SRCDIR([src/diff.c])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -34,7 +36,6 @@ AC_CONFIG_HEADERS([lib/config.h:lib/config.hin])
 
 AC_PROG_AWK
 AC_PROG_CC
-AM_PROG_CC_C_O
 AM_MISSING_PROG([HELP2MAN], [help2man])
 AC_PROG_RANLIB
 gl_EARLY
@@ -45,60 +46,91 @@ gl_INIT
 # Note -Wvla is implicitly added by gl_MANYWARN_ALL_GCC
 AC_DEFINE([GNULIB_NO_VLA], [1], [Define to 1 to disable use of VLAs])
 
+# diffutils is single-threaded; optimize for this.
+AC_DEFINE([GNULIB_EXCLUDE_SINGLE_THREAD], [1],
+  ['exclude' code is called only from 1 thread.])
+AC_DEFINE([GNULIB_MBRTOWC_SINGLE_THREAD], [1],
+  ['mbrtowc', 'mbrtoc32', 'regex' code is called only from 1 thread.])
+AC_DEFINE([GNULIB_REGEX_SINGLE_THREAD], [1],
+  ['regex' code is called only from 1 thread.])
+AC_DEFINE([GNULIB_WCHAR_SINGLE_LOCALE], [1],
+  [Locale-sensitive functions are called only after locale is set.])
+
+# gl_GCC_VERSION_IFELSE([major], [minor], [run-if-found], [run-if-not-found])
+# ------------------------------------------------
+# If $CPP is gcc-MAJOR.MINOR or newer, then run RUN-IF-FOUND.
+# Otherwise, run RUN-IF-NOT-FOUND.
+AC_DEFUN([gl_GCC_VERSION_IFELSE],
+  [AC_PREPROC_IFELSE(
+    [AC_LANG_PROGRAM(
+      [[
+#if ($1) < __GNUC__ || (($1) == __GNUC__ && ($2) <= __GNUC_MINOR__)
+/* ok */
+#else
+# error "your version of gcc is older than $1.$2"
+#endif
+      ]]),
+    ], [$3], [$4])
+  ]
+)
+
 AC_ARG_ENABLE([gcc-warnings],
-  [AS_HELP_STRING([--enable-gcc-warnings],
-                  [turn on lots of GCC warnings (for developers)])],
+  [AS_HELP_STRING([[--enable-gcc-warnings[=TYPE]]],
+    [control generation of GCC warnings.  The TYPE 'no' disables
+     warnings (default for non-developer builds); 'yes' generates
+     cheap warnings if available (default for developer builds);
+     'expensive' in addition generates expensive-to-compute warnings
+     if available.])],
   [case $enableval in
-     yes|no) ;;
+     no|yes|expensive) ;;
      *)      AC_MSG_ERROR([bad value $enableval for gcc-warnings option]) ;;
    esac
    gl_gcc_warnings=$enableval],
-  [if test -d "$srcdir"/.git; then
-     gl_gcc_warnings=yes
-   else
-     gl_gcc_warnings=no
-   fi]
+  [
+   # GCC provides fine-grained control over diagnostics which
+   # is used in gnulib for example to suppress warnings from
+   # certain sections of code.  So if this is available and
+   # we're running from a git repo, then auto enable the warnings.
+   gl_gcc_warnings=no
+   gl_GCC_VERSION_IFELSE([4], [6],
+                         [test -d "$srcdir"/.git \
+                          && ! test -f "$srcdir"/.tarball-version \
+                          && gl_gcc_warnings=yes])]
 )
 
-if test "$gl_gcc_warnings" = yes; then
+if test $gl_gcc_warnings != no; then
   gl_WARN_ADD([-Werror], [WERROR_CFLAGS])
   AC_SUBST([WERROR_CFLAGS])
 
-  nw=
+  ew=
+  AS_IF([test $gl_gcc_warnings != expensive],
+    [# -fanalyzer and related options slow GCC considerably.
+     ew="$ew -fanalyzer -Wno-analyzer-malloc-leak"])
+
   # This, $nw, is the list of warnings we disable.
-  nw="$nw -Winline"                 # system.h's readdir_ignoring_dot_and_dotdot
-  nw="$nw -Wstack-protector"        # not worth working around
+  nw=$ew
+  nw="$nw -Winline"                 # not a correctness warning
 
   gl_MANYWARN_ALL_GCC([ws])
   gl_MANYWARN_COMPLEMENT([ws], [$ws], [$nw])
   for w in $ws; do
     gl_WARN_ADD([$w])
   done
-  gl_WARN_ADD([-Wno-sign-compare])     # Too many warnings for now
-  gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
+  gl_WARN_ADD([-Wno-sign-compare])     # Too many false positives
   gl_WARN_ADD([-Wno-format-nonliteral])
-
-  gl_WARN_ADD([-fdiagnostics-show-option])
-  gl_WARN_ADD([-funit-at-a-time])
-  gl_WARN_ADD([-fno-common])
 
   AC_SUBST([WARN_CFLAGS])
 
   AC_DEFINE([GCC_LINT], [1],
     [Define to 1 if the compiler is checking for lint.])
-  AC_DEFINE([_FORTIFY_SOURCE], [2],
-    [enable compile-time and run-time bounds-checking, and some warnings])
+  AH_VERBATIM([FORTIFY_SOURCE],
+  [/* Enable compile-time and run-time bounds-checking, and some warnings,
+      without upsetting glibc 2.15+. */
+   #if !defined _FORTIFY_SOURCE && defined __OPTIMIZE__ && __OPTIMIZE__
+   # define _FORTIFY_SOURCE 2
+   #endif
+  ])
   AC_DEFINE([GNULIB_PORTCHECK], [1], [enable some gnulib portability checks])
-
-  # We use a slightly smaller set of warning options for lib/.
-  # Remove the following and save the result in GNULIB_WARN_CFLAGS.
-  nw=
-  nw="$nw -Wunused-macros"
-  nw="$nw -Wsuggest-attribute=pure"
-  nw="$nw -Wduplicated-branches"    # Too many false alarms
-
-  gl_MANYWARN_COMPLEMENT([GNULIB_WARN_CFLAGS], [$WARN_CFLAGS], [$nw])
-  AC_SUBST([GNULIB_WARN_CFLAGS])
 fi
 
 AC_C_INLINE
@@ -119,7 +151,6 @@ AC_CHECK_FUNCS_ONCE([sigaction sigprocmask strcasecoll stricoll])
 if test $ac_cv_func_sigprocmask = no; then
   AC_CHECK_FUNCS([sigblock])
 fi
-AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_FORK
 
 # When .tarball-version exists, we're building from a tarball

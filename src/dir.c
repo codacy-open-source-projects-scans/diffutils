@@ -58,8 +58,8 @@ dir_read (struct file_data const *dir, struct dirdata *dirdata)
   /* Allocated and used storage for file name data.  */
   char *data;
 
-  dirdata->names = 0;
-  dirdata->data = 0;
+  dirdata->names = nullptr;
+  dirdata->data = nullptr;
 
   if (dir->desc != -1)
     {
@@ -102,19 +102,14 @@ dir_read (struct file_data const *dir, struct dirdata *dirdata)
           data_used += d_size;
           nnames++;
         }
-      if (errno)
-        {
-          int e = errno;
-          closedir (reading);
-          errno = e;
+
+      int readdir_errno = errno;
+      if (closedir (reading) < 0 || readdir_errno)
+	{
+	  if (readdir_errno)
+	    errno = readdir_errno;
           return false;
         }
-#if CLOSEDIR_VOID
-      closedir (reading);
-#else
-      if (closedir (reading) != 0)
-        return false;
-#endif
     }
 
   /* Create the 'names' table from the 'data' table.  */
@@ -126,7 +121,7 @@ dir_read (struct file_data const *dir, struct dirdata *dirdata)
       names[i] = data;
       data += strlen (data) + 1;
     }
-  names[nnames] = 0;
+  names[nnames] = nullptr;
   return true;
 }
 

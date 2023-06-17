@@ -3,6 +3,7 @@
 *.o
 *.orig
 *.patch
+*.rej
 *~
 .Tpo
 .deps/
@@ -50,6 +51,7 @@ lib/config.h
 lib/config.hin
 lib/configmake.h
 lib/ctype.h
+lib/error.h
 lib/errno.h
 lib/fcntl.h
 lib/fnmatch.h
@@ -85,6 +87,7 @@ lib/uniwidth.h
 lib/warn-on-use.h
 lib/wchar.h
 lib/wctype.h
+lib/uchar.h
 man/*.1
 po/*.gmo
 po/*.po

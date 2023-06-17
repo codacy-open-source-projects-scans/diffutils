@@ -423,10 +423,11 @@ static struct change * ATTRIBUTE_PURE
 find_hunk (struct change *start)
 {
   /* Threshold distance is CONTEXT if the second change is ignorable,
-     2 * CONTEXT + 1 otherwise.  Integer overflow can't happen, due
-     to CONTEXT_LIM.  */
+     min (2 * CONTEXT + 1, LIN_MAX) otherwise.  */
   lin ignorable_threshold = context;
-  lin non_ignorable_threshold = 2 * context + 1;
+  lin non_ignorable_threshold = (ckd_mul (&non_ignorable_threshold, context, 2)
+				 ? LIN_MAX
+				 : non_ignorable_threshold + 1);
 
   while (true)
     {

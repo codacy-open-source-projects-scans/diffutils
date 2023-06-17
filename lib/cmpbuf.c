@@ -18,6 +18,8 @@
 
 #include <config.h>
 
+#include "cmpbuf.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -26,14 +28,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <sys/types.h>
-#include "cmpbuf.h"
 
-#ifndef SSIZE_MAX
-# define SSIZE_MAX TYPE_MAXIMUM (ssize_t)
-#endif
-
-#undef MIN
-#define MIN(a, b) ((a) <= (b) ? (a) : (b))
+#include "minmax.h"
 
 /* Read NBYTES bytes from descriptor FD into BUF.
    Return the number of characters successfully read.

@@ -102,10 +102,10 @@ file_block_read (struct file_data *current, idx_t size)
 
 /* Check for binary files and compare them for exact identity.  */
 
-/* Return 1 if BUF contains a non text character.
+/* Return true if BUF contains a non text character.
    SIZE is the number of characters in BUF.  */
 
-#define binary_file_p(buf, size) (memchr (buf, 0, size) != 0)
+#define binary_file_p(buf, size) (!! memchr (buf, 0, size))
 
 /* Get ready to read the current file.
    Return nonzero if SKIP_TEST is zero,
@@ -667,8 +667,7 @@ find_identical_ends (struct file_data filevec[])
     {
       middle_guess = guess_lines (0, 0, p0 - filevec[0].prefix_end);
       lin suffix_guess = guess_lines (0, 0, buffer0 + n0 - p0);
-      for (prefix_count = 1;  prefix_count <= context;  prefix_count *= 2)
-        continue;
+      prefix_count = (lin) 1 << (floor_log2 (context) + 1);
       alloc_lines0 = (prefix_count + middle_guess
                       + MIN (context, suffix_guess));
     }

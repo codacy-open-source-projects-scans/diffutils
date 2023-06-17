@@ -105,15 +105,12 @@ int strcasecmp (char const *, char const *);
 # define SIGCHLD SIGCLD
 #endif
 
-#undef MIN
-#undef MAX
-#define MIN(a, b) ((a) <= (b) ? (a) : (b))
-#define MAX(a, b) ((a) >= (b) ? (a) : (b))
-
 #include <attribute.h>
 #include <idx.h>
 #include <intprops.h>
+#include <minmax.h>
 #include <propername.h>
+#include <same-inode.h>
 
 #include "version.h"
 
@@ -141,11 +138,6 @@ typedef ptrdiff_t lin;
 #define LIN_MAX PTRDIFF_MAX
 #define pI "t"
 verify (LIN_MAX <= IDX_MAX);
-
-/* Limit so that 2 * CONTEXT + 1 does not overflow.  */
-
-#define CONTEXT_MAX ((LIN_MAX - 1) / 2)
-
 
 /* This section contains POSIX-compliant defaults for macros
    that are meant to be overridden by hand in config.h as needed.  */
@@ -177,7 +169,7 @@ verify (LIN_MAX <= IDX_MAX);
 /* Do struct stat *S, *T describe the same file?  Answer -1 if unknown.  */
 #ifndef same_file
 # define same_file(s, t) \
-    ((((s)->st_ino == (t)->st_ino) && ((s)->st_dev == (t)->st_dev)) \
+    (SAME_INODE (*s, *t) \
      || same_special_file (s, t))
 #endif
 
@@ -219,9 +211,8 @@ verify (LIN_MAX <= IDX_MAX);
 
 #define STREQ(a, b) (strcmp (a, b) == 0)
 
-/* Return the floor of the log base 2 of N.  N must be positive.  */
-SYSTEM_INLINE int
-floor_log2 (idx_t n)
+/* Return the floor of the log base 2 of N.  Return -1 if N is zero.  */
+SYSTEM_INLINE int floor_log2 (idx_t n)
 {
   verify (IDX_MAX <= ULLONG_MAX);
   return ULLONG_WIDTH - 1 - count_leading_zeros_ll (n);

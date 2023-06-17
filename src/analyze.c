@@ -30,9 +30,9 @@
 #define OFFSET lin
 #define OFFSET_MAX LIN_MAX
 #define EXTRA_CONTEXT_FIELDS /* none */
-#define NOTE_DELETE(c, xoff) (files[0].changed[files[0].realindexes[xoff]] = 1)
-#define NOTE_INSERT(c, yoff) (files[1].changed[files[1].realindexes[yoff]] = 1)
-#define USE_HEURISTIC 1
+#define NOTE_DELETE(c, x) (files[0].changed[files[0].realindexes[x]] = true)
+#define NOTE_INSERT(c, y) (files[1].changed[files[1].realindexes[y]] = true)
+#define USE_HEURISTIC
 #include <diffseq.h>
 
 /* Discard lines from one file that have no matches in the other file.
@@ -226,7 +226,7 @@ discard_confusing_lines (struct file_data filevec[])
             filevec[f].realindexes[j++] = i;
           }
         else
-          filevec[f].changed[i] = 1;
+          filevec[f].changed[i] = true;
       filevec[f].nondiscarded_lines = j;
     }
 
@@ -249,14 +249,14 @@ shift_boundaries (struct file_data filevec[])
 {
   for (int f = 0; f < 2; f++)
     {
-      char *changed = filevec[f].changed;
-      char *other_changed = filevec[1 - f].changed;
+      bool *changed = filevec[f].changed;
+      bool *other_changed = filevec[1 - f].changed;
       lin const *equivs = filevec[f].equivs;
       lin i = 0;
       lin j = 0;
       lin i_end = filevec[f].buffered_lines;
 
-      while (1)
+      while (true)
         {
           /* Scan forwards to find beginning of another run of changes.
              Also keep track of the corresponding point in the other file.  */
@@ -294,8 +294,8 @@ shift_boundaries (struct file_data filevec[])
 
               while (start && equivs[start - 1] == equivs[i - 1])
                 {
-                  changed[--start] = 1;
-                  changed[--i] = 0;
+                  changed[--start] = true;
+                  changed[--i] = false;
                   while (changed[start - 1])
                     start--;
                   while (other_changed[--j])
@@ -315,8 +315,8 @@ shift_boundaries (struct file_data filevec[])
 
               while (i != i_end && equivs[start] == equivs[i])
                 {
-                  changed[start++] = 0;
-                  changed[i++] = 1;
+                  changed[start++] = false;
+                  changed[i++] = true;
                   while (changed[i])
                     i++;
                   while (other_changed[++j])
@@ -330,8 +330,8 @@ shift_boundaries (struct file_data filevec[])
 
           while (corresponding < i)
             {
-              changed[--start] = 1;
-              changed[--i] = 0;
+              changed[--start] = true;
+              changed[--i] = false;
               while (other_changed[--j])
                 continue;
             }
@@ -367,9 +367,9 @@ add_change (lin line0, lin line1, lin deleted, lin inserted,
 static struct change *
 build_reverse_script (struct file_data const filevec[])
 {
-  struct change *script = 0;
-  char *changed0 = filevec[0].changed;
-  char *changed1 = filevec[1].changed;
+  struct change *script = nullptr;
+  bool *changed0 = filevec[0].changed;
+  bool *changed1 = filevec[1].changed;
   lin len0 = filevec[0].buffered_lines;
   lin len1 = filevec[1].buffered_lines;
 
@@ -404,9 +404,9 @@ build_reverse_script (struct file_data const filevec[])
 static struct change *
 build_script (struct file_data const filevec[])
 {
-  struct change *script = 0;
-  char *changed0 = filevec[0].changed;
-  char *changed1 = filevec[1].changed;
+  struct change *script = nullptr;
+  bool *changed0 = filevec[0].changed;
+  bool *changed1 = filevec[1].changed;
   lin i0 = filevec[0].buffered_lines, i1 = filevec[1].buffered_lines;
 
   /* Note that changedN[-1] does exist, and is 0.  */
@@ -520,9 +520,9 @@ diff_2_files (struct comparison *cmp)
       /* Allocate vectors for the results of comparison:
          a flag for each line of each file, saying whether that line
          is an insertion or deletion.
-         Allocate an extra element, always 0, at each end of each vector.  */
+         Allocate an extra false element at each end of each vector.  */
 
-      char *flag_space = xizalloc (cmp->file[0].buffered_lines
+      bool *flag_space = xizalloc (cmp->file[0].buffered_lines
 				   + cmp->file[1].buffered_lines + 4);
       cmp->file[0].changed = flag_space + 1;
       cmp->file[1].changed = flag_space + cmp->file[0].buffered_lines + 3;
@@ -613,7 +613,7 @@ diff_2_files (struct comparison *cmp)
                  to be used if and when we have some output to print.  */
               setup_output (file_label[0] ? file_label[0] : cmp->file[0].name,
                             file_label[1] ? file_label[1] : cmp->file[1].name,
-                            cmp->parent != 0);
+                            !!cmp->parent);
 
               switch (output_style)
                 {

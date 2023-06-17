@@ -271,12 +271,10 @@ test -n "$EXEEXT" && test -n "$BASH_VERSION" && shopt -s expand_aliases
 #
 # First, try to use the mktemp program.
 # Failing that, we'll roll our own mktemp-like function:
-#  - try to get random bytes from /dev/urandom
+#  - try to get random bytes from /dev/urandom, mapping them to file-name bytes
 #  - failing that, generate output from a combination of quickly-varying
-#      sources and gzip.  Ignore non-varying gzip header, and extract
-#      "random" bits from there.
-#  - given those bits, map to file-name bytes using tr, and try to create
-#      the desired directory.
+#      sources and awk.
+#  - try to create the desired directory.
 #  - make only $MAX_TRIES_ attempts
 
 # Helper function.  Print $N pseudo-random bytes from a-zA-Z0-9.
@@ -296,20 +294,27 @@ rand_bytes_ ()
     return
   fi
 
-  n_plus_50_=`expr $n_ + 50`
-  cmds_='date; date +%N; free; who -a; w; ps auxww; ps -ef'
-  data_=` (eval "$cmds_") 2>&1 | gzip `
+  # Fall back on quickly-varying sources + awk.
+  # Limit awk program to 7th Edition Unix so that it works even on Solaris 10.
 
-  # Ensure that $data_ has length at least 50+$n_
-  while :; do
-    len_=`echo "$data_"|wc -c`
-    test $n_plus_50_ -le $len_ && break;
-    data_=` (echo "$data_"; eval "$cmds_") 2>&1 | gzip `
-  done
-
-  echo "$data_" \
-    | dd bs=1 skip=50 count=$n_ 2>/dev/null \
-    | LC_ALL=C tr -c $chars_ 01234567$chars_$chars_$chars_
+  (date; date +%N; free; who -a; w; ps auxww; ps -ef) 2>&1 | awk '
+     BEGIN {
+       n = '"$n_"'
+       for (i = 0; i < 256; i++)
+         ordinal[sprintf ("%c", i)] = i
+     }
+     {
+       for (i = 1; i <= length; i++)
+         a[ai++ % n] += ordinal[substr ($0, i, 1)]
+     }
+     END {
+       chars = "'"$chars_"'"
+       charslen = length (chars)
+       for (i = 0; i < n; i++)
+         printf "%s", substr (chars, a[i] % charslen + 1, 1)
+       printf "\n"
+     }
+  '
 }
 
 mktempd_ ()
@@ -641,18 +646,19 @@ compare_dev_null_ ()
 
 for diff_opt_ in -u -U3 -c '' no; do
   test "$diff_opt_" != no &&
-    diff_out_=`exec 2>/dev/null; diff $diff_opt_ "$0" "$0" < /dev/null` &&
+    diff_out_=`exec 2>/dev/null
+      LC_ALL=C diff $diff_opt_ "$0" "$0" < /dev/null` &&
     break
 done
 if test "$diff_opt_" != no; then
   if test -z "$diff_out_"; then
-    compare_ () { diff $diff_opt_ "$@"; }
+    compare_ () { LC_ALL=C diff $diff_opt_ "$@"; }
   else
     compare_ ()
     {
       # If no differences were found, AIX and HP-UX 'diff' produce output
       # like "No differences encountered".  Hide this output.
-      diff $diff_opt_ "$@" > diff.out
+      LC_ALL=C diff $diff_opt_ "$@" > diff.out
       diff_status_=$?
       test $diff_status_ -eq 0 || cat diff.out || diff_status_=2
       rm -f diff.out || diff_status_=2
@@ -697,4 +703,4 @@ test -f "$srcdir/init.cfg" \
 setup_ "$@"
 # This trap is here, rather than in the setup_ function, because some
 # shells run the exit trap at shell function exit, rather than script exit.
-trap remove_tmp_ 0
+trap remove_tmp_ EXIT

@@ -22,7 +22,7 @@
 
 #include "diff.h"
 
-#include <wchar.h>
+#include <uchar.h>
 
 static void print_sdiff_common_lines (lin, lin);
 static void print_sdiff_hunk (struct change *);
@@ -135,12 +135,12 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
 
         default:
           {
-            wchar_t wc;
-            size_t bytes = mbrtowc (&wc, tp0, text_limit - tp0, &mbstate);
+            char32_t wc;
+            size_t bytes = mbrtoc32 (&wc, tp0, text_limit - tp0, &mbstate);
 
             if (0 < bytes && bytes < (size_t) -2)
               {
-                int width = wcwidth (wc);
+                int width = c32width (wc);
                 if (0 < width)
                   in_position += width;
                 if (in_position <= out_bound)

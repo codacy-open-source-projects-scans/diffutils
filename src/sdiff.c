@@ -27,7 +27,6 @@
 
 #include <c-stack.h>
 #include <dirname.h>
-#include "die.h"
 #include <error.h>
 #include <exitfail.h>
 #include <file-type.h>
@@ -42,7 +41,7 @@
 static char const PROGRAM_NAME[] = "sdiff";
 
 #define AUTHORS \
-  proper_name ("Thomas Lord")
+  _("Thomas Lord")
 
 /* Size of chunks read from files which must be parsed into lines.  */
 enum { SDIFF_BUFSIZE = 65536 };
@@ -136,6 +135,7 @@ enum
   TABSIZE_OPTION
 };
 
+static char const shortopts[] = "abBdEHiI:lo:stvw:WZ";
 static struct option const longopts[] =
 {
   {"diff-program", 1, 0, DIFF_PROGRAM_OPTION},
@@ -166,7 +166,7 @@ try_help (char const *reason_msgid, char const *operand)
 {
   if (reason_msgid)
     error (0, 0, _(reason_msgid), operand);
-  die (EXIT_TROUBLE, 0, _("Try '%s --help' for more information."),
+  error (EXIT_TROUBLE, 0, _("Try '%s --help' for more information."),
          program_name);
 }
 
@@ -205,7 +205,7 @@ static char const *const option_help_msgid[] = {
   "",
   N_("    --help                   display this help and exit"),
   N_("-v, --version                output version information and exit"),
-  0
+  nullptr
 };
 
 static void
@@ -439,7 +439,7 @@ lf_snarf (struct line_filter *lf, char *buffer, idx_t bufsize)
       bufsize -= s;
       if (next < lf->buflim)
         {
-          *buffer = 0;
+          *buffer = '\0';
           lf->bufpos = next + 1;
           return 1;
         }
@@ -466,103 +466,101 @@ main (int argc, char *argv[])
 
   diffarg (DEFAULT_DIFF_PROGRAM);
 
-  /* parse command line args */
-  for (int opt;
-       ((opt = getopt_long (argc, argv, "abBdEHiI:lo:stvw:WZ", longopts, 0))
-        != -1); )
-    {
-      switch (opt)
-        {
-        case 'a':
-          diffarg ("-a");
-          break;
+  /* Parse command line options.  */
 
-        case 'b':
-          diffarg ("-b");
-          break;
+  for (int c;
+       0 <= (c = getopt_long (argc, argv, shortopts, longopts, 0)); )
+    switch (c)
+      {
+      case 'a':
+	diffarg ("-a");
+	break;
 
-        case 'B':
-          diffarg ("-B");
-          break;
+      case 'b':
+	diffarg ("-b");
+	break;
 
-        case 'd':
-          diffarg ("-d");
-          break;
+      case 'B':
+	diffarg ("-B");
+	break;
 
-        case 'E':
-          diffarg ("-E");
-          break;
+      case 'd':
+	diffarg ("-d");
+	break;
 
-        case 'H':
-          diffarg ("-H");
-          break;
+      case 'E':
+	diffarg ("-E");
+	break;
 
-        case 'i':
-          diffarg ("-i");
-          break;
+      case 'H':
+	diffarg ("-H");
+	break;
 
-        case 'I':
-          diffarg ("-I");
-          diffarg (optarg);
-          break;
+      case 'i':
+	diffarg ("-i");
+	break;
 
-        case 'l':
-          diffarg ("--left-column");
-          break;
+      case 'I':
+	diffarg ("-I");
+	diffarg (optarg);
+	break;
 
-        case 'o':
-          output = optarg;
-          break;
+      case 'l':
+	diffarg ("--left-column");
+	break;
 
-        case 's':
-          suppress_common_lines = true;
-          break;
+      case 'o':
+	output = optarg;
+	break;
 
-        case 't':
-          diffarg ("-t");
-          break;
+      case 's':
+	suppress_common_lines = true;
+	break;
 
-        case 'v':
-          version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version,
-                       AUTHORS, nullptr);
-          check_stdout ();
-          return EXIT_SUCCESS;
+      case 't':
+	diffarg ("-t");
+	break;
 
-        case 'w':
-          diffarg ("-W");
-          diffarg (optarg);
-          break;
+      case 'v':
+	version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version,
+		     AUTHORS, nullptr);
+	check_stdout ();
+	return EXIT_SUCCESS;
 
-        case 'W':
-          diffarg ("-w");
-          break;
+      case 'w':
+	diffarg ("-W");
+	diffarg (optarg);
+	break;
 
-        case 'Z':
-          diffarg ("-Z");
-          break;
+      case 'W':
+	diffarg ("-w");
+	break;
 
-        case DIFF_PROGRAM_OPTION:
-          diffargv[0] = optarg;
-          break;
+      case 'Z':
+	diffarg ("-Z");
+	break;
 
-        case HELP_OPTION:
-          usage ();
-          check_stdout ();
-          return EXIT_SUCCESS;
+      case DIFF_PROGRAM_OPTION:
+	diffargv[0] = optarg;
+	break;
 
-        case STRIP_TRAILING_CR_OPTION:
-          diffarg ("--strip-trailing-cr");
-          break;
+      case HELP_OPTION:
+	usage ();
+	check_stdout ();
+	return EXIT_SUCCESS;
 
-        case TABSIZE_OPTION:
-          diffarg ("--tabsize");
-          diffarg (optarg);
-          break;
+      case STRIP_TRAILING_CR_OPTION:
+	diffarg ("--strip-trailing-cr");
+	break;
 
-        default:
-          try_help (0, 0);
-        }
-    }
+      case TABSIZE_OPTION:
+	diffarg ("--tabsize");
+	diffarg (optarg);
+	break;
+
+      default:
+	try_help (nullptr, nullptr);
+      }
 
   if (argc - optind != 2)
     {
@@ -581,7 +579,7 @@ main (int argc, char *argv[])
       diffarg ("--");
       diffarg (argv[optind]);
       diffarg (argv[optind + 1]);
-      diffarg (0);
+      diffarg (nullptr);
       execvp (diffargv[0], (char **) diffargv);
       perror_fatal (diffargv[0]);
     }
@@ -605,7 +603,7 @@ main (int argc, char *argv[])
       diffarg ("--");
       diffarg (argv[optind]);
       diffarg (argv[optind + 1]);
-      diffarg (0);
+      diffarg (nullptr);
 
       trapsigs ();
 
@@ -689,7 +687,7 @@ main (int argc, char *argv[])
         if (tmpname)
           {
             unlink (tmpname);
-            tmpname = 0;
+            tmpname = nullptr;
           }
 
         if (! interact_ok)
@@ -758,7 +756,7 @@ trapsigs (void)
   for (int i = 0;  i < NUM_SIGS;  i++)
     {
 #if HAVE_SIGACTION
-      sigaction (sigs[i], 0, &initial_action[i]);
+      sigaction (sigs[i], nullptr, &initial_action[i]);
 #else
       initial_action[i] = signal (sigs[i], SIG_IGN);
 #endif
@@ -783,7 +781,7 @@ untrapsig (int s)
       if ((! s || sigs[i] == s)  &&  initial_handler (i) != SIG_IGN)
         {
 #if HAVE_SIGACTION
-          sigaction (sigs[i], &initial_action[i], 0);
+          sigaction (sigs[i], &initial_action[i], nullptr);
 #else
           signal (sigs[i], initial_action[i]);
 #endif
