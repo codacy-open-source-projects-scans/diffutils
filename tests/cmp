@@ -228,4 +228,27 @@ cmp -bl j1 j2 > out2
 test $? -eq 1 || fail=1
 compare exp2 out2 || fail=1
 
+if (LC_ALL=en_US.iso8859-1 locale charmap) >/dev/null 2>&1; then
+  printf '\200\300\377\n' >j3
+  printf '\0@\177\n' >j4
+  cat <<'EOF' >exp3 || fail=1
+1 200 M-^@   0 ^@
+2 300 M-@  100 @
+3 377 M-^? 177 ^?
+EOF
+  LC_ALL=en_US.iso8859-1 cmp -bl j3 j4 >out3
+  test $? -eq 1 || fail=1
+  compare exp3 out3 || fail=1
+fi
+
+big=99999999999999999999999999999999999999999999999999999999999
+cmp -i $big j1 j2 || fail=1
+cmp -i 1000 -n $big j1 j2 || fail=1
+
+rm -f a b
+if timeout 0.1 true && truncate -s 14T a && truncate -s 15T b; then
+  returns_ 1 timeout 0.1 cmp a b >/dev/null || fail=1
+fi
+rm -f a b
+
 Exit $fail

@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <sys/types.h>
 
+#include "intprops.h"
 #include "minmax.h"
 
 /* Read NBYTES bytes from descriptor FD into BUF.
@@ -54,12 +55,29 @@ block_read (int fd, char *buf, idx_t nbytes)
             break;
 
           /* Accommodate FreeBSD 13, which can't read more than INT_MAX bytes
-	     when debug.iosize_max_clamp is nonzero.  */
-          if (errno == EINVAL && INT_MAX < bytes_to_read)
-            {
-              readlim = INT_MAX;
-              continue;
-            }
+	     when debug.iosize_max_clamp is nonzero.  Prefer a power
+	     of two for the read limit in this case.
+
+	     Also, work around a bug in Linux kernel 6.3.8 tmpfs,
+	     which fails if the current offset + bytes_to_read exceeds
+	     TYPE_MAXIMUM (off_t), even if EOF occurs before then.  */
+	  if (errno == EINVAL)
+	    {
+	      if (bytes_to_read <= 1)
+		{
+		  if (lseek (fd, 0, SEEK_CUR) == TYPE_MAXIMUM (off_t))
+		    {
+		      nread = 0;
+		      break;
+		    }
+		  errno = EINVAL;
+		}
+	      else
+		{
+		  readlim = MIN (bytes_to_read >> 1, INT_MAX / 2 + 1);
+		  continue;
+		}
+	    }
 
           /* This is needed for programs that have signal handlers on
              older hosts without SA_RESTART.  It also accommodates

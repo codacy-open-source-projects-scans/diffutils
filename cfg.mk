@@ -42,6 +42,9 @@ old_NEWS_hash = d6a8096805f9b3ee162842058477f0bc
 # via diff.h or system.h.
 config_h_header = (<config\.h>|"(diff|system)\.h")
 
+# Add an exemption for sc_makefile_at_at_check.
+_makefile_at_at_check_exceptions = ' && !/MAKEINFO/'
+
 update-copyright-env = \
   UPDATE_COPYRIGHT_USE_INTERVALS=1 \
   UPDATE_COPYRIGHT_MAX_LINE_LENGTH=79

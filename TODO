@@ -6,8 +6,10 @@ GNU patch already parses this format.
 
 Add --include option (opposite of --exclude).
 
+Add SEEK_DATA/SEEK_HOLE sparse file optimization to cmp, diff -q, etc.
+
 Look into sdiff improvement here:
-http://www.pkix.net/~chuck/sdiff2.diff
+https://web.archive.org/web/20090106164131/http://www.pkix.net/~chuck/sdiff2.diff
 
 Propagate stderr from subprocess so that diff3 does
 a better job of explaining _why_:

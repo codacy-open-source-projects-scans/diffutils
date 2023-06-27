@@ -2,6 +2,23 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Bug fixes
+
+  cmp -bl no longer omits "M-" from bytes with the high bit set in
+  single-byte locales like en_US.iso8859-1.  This fix causes the
+  behavior to be locale independent, and to be the same as the
+  longstanding behavior in the C locale and in locales using UTF-8.
+  [bug introduced in 2.9]
+
+  cmp -i N and -n N no longer fail merely because N is enormous.
+  [bug present since "the beginning"]
+
+  cmp -s no longer mishandles /proc files, for which the Linux kernel
+  reports a zero size even when nonempty.  For example, the following
+  shell command now outputs nothing, as it should:
+    cp /proc/cmdline t; cmp -s /proc/cmdline t || echo files differ
+  [bug present since "the beginning"]
+
 
 * Noteworthy changes in release 3.10 (2023-05-21) [stable]
 

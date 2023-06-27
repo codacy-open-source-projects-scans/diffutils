@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "diff.h"
-#include "c-ctype.h"
 #include <stat-time.h>
 #include <strftime.h>
 

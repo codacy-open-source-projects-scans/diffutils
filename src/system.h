@@ -89,15 +89,6 @@ int strcasecmp (char const *, char const *);
 
 #include <ctype.h>
 
-/* ISDIGIT differs from isdigit, as follows:
-   - Its arg may be any int or unsigned int; it need not be an unsigned char.
-   - It's guaranteed to evaluate its argument exactly once.
-   - It's typically faster.
-   POSIX 1003.1-2001 says that only '0' through '9' are digits.
-   Prefer ISDIGIT to isdigit unless it's important to use the locale's
-   definition of 'digit' even when the host does not conform to POSIX.  */
-#define ISDIGIT(c) ((unsigned int) (c) - '0' <= 9)
-
 #include <errno.h>
 
 #include <signal.h>
@@ -106,6 +97,7 @@ int strcasecmp (char const *, char const *);
 #endif
 
 #include <attribute.h>
+#include <c-ctype.h>
 #include <idx.h>
 #include <intprops.h>
 #include <minmax.h>

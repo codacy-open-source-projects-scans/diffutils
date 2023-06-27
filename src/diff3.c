@@ -1062,7 +1062,7 @@ readnum (char *s, lin *pnum)
   unsigned char c = *s;
   lin num = 0;
 
-  if (! ISDIGIT (c))
+  if (! c_isdigit (c))
     return nullptr;
 
   do
@@ -1070,7 +1070,7 @@ readnum (char *s, lin *pnum)
       num = c - '0' + num * 10;
       c = *++s;
     }
-  while (ISDIGIT (c));
+  while (c_isdigit (c));
 
   *pnum = num;
   return s;

@@ -119,7 +119,9 @@ format_group (FILE *out, char const *format, char endchar,
     {
       char const *f1 = ++f;
       if (c == '%')
-        switch ((c = *f++))
+       {
+	c = *f++;
+	switch (c)
           {
           case '%':
             break;
@@ -131,7 +133,7 @@ format_group (FILE *out, char const *format, char endchar,
 
               for (int i = 0; i < 2; i++)
                 {
-                  if (ISDIGIT (*f))
+                  if (c_isdigit (*f))
                     {
                       char *fend;
                       errno = 0;
@@ -189,6 +191,7 @@ format_group (FILE *out, char const *format, char endchar,
             f = f1;
             break;
           }
+       }
 
       if (out)
         putc (c, out);
@@ -262,7 +265,9 @@ print_ifdef_lines (FILE *out, char const *format,
         {
           char const *f1 = f;
           if (c == '%')
-            switch ((c = *f++))
+	   {
+	    c = *f++;
+	    switch (c)
               {
               case '%':
                 break;
@@ -287,6 +292,7 @@ print_ifdef_lines (FILE *out, char const *format,
                 f = f1;
                 break;
               }
+	   }
 
           putc (c, out);
         }
@@ -306,10 +312,10 @@ do_printf_spec (FILE *out, char const *spec,
   f++;
   while ((c = *f++) == '-' || c == '\'' || c == '0')
     continue;
-  while (ISDIGIT (c))
+  while (c_isdigit (c))
     c = *f++;
   if (c == '.')
-    while (ISDIGIT (c = *f++))
+    while (c_isdigit (c = *f++))
       continue;
   char c1 = *f++;
 

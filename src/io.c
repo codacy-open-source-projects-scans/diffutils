@@ -273,8 +273,11 @@ find_and_hash_each_line (struct file_data *current)
               if (isspace (c))
                 {
                   do
-                    if ((c = *p++) == '\n')
-                      goto hashing_done;
+		    {
+		      c = *p++;
+		      if (c == '\n')
+			goto hashing_done;
+		    }
                   while (isspace (c));
 
                   h = hash (h, ' ');
@@ -298,11 +301,14 @@ find_and_hash_each_line (struct file_data *current)
                     char const *p1 = p;
                     unsigned char c1;
                     do
-                      if ((c1 = *p1++) == '\n')
-                        {
-                          p = p1;
-                          goto hashing_done;
-                        }
+		      {
+			c1 = *p1++;
+			if (c1 == '\n')
+			  {
+			    p = p1;
+			    goto hashing_done;
+			  }
+		      }
                     while (isspace (c1));
                   }
 

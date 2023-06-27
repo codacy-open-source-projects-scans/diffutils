@@ -110,6 +110,7 @@ if test $gl_gcc_warnings != no; then
   # This, $nw, is the list of warnings we disable.
   nw=$ew
   nw="$nw -Winline"                 # not a correctness warning
+  nw="$nw -Wstack-protector"        # not a correctness warning
 
   gl_MANYWARN_ALL_GCC([ws])
   gl_MANYWARN_COMPLEMENT([ws], [$ws], [$nw])

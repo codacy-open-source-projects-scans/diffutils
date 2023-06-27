@@ -321,7 +321,7 @@ main (int argc, char **argv)
       case '7':
       case '8':
       case '9':
-	if (! ISDIGIT (prev))
+	if (! c_isdigit (prev))
 	  ocontext = 0;
 	if (ckd_mul (&ocontext, ocontext, 10)
 	    || ckd_add (&ocontext, ocontext, c - '0'))
@@ -1478,20 +1478,27 @@ compare_files (struct comparison const *parent,
       int oflags = O_RDONLY | (binary ? O_BINARY : 0);
 
       if (cmp.file[0].desc == UNOPENED)
-        if ((cmp.file[0].desc = open (cmp.file[0].name, oflags, 0)) < 0)
-          {
-            perror_with_name (cmp.file[0].name);
-            status = EXIT_TROUBLE;
-          }
+	{
+	  cmp.file[0].desc = open (cmp.file[0].name, oflags);
+	  if (cmp.file[0].desc < 0)
+	    {
+	      perror_with_name (cmp.file[0].name);
+	      status = EXIT_TROUBLE;
+	    }
+	}
       if (cmp.file[1].desc == UNOPENED)
         {
           if (same_files)
             cmp.file[1].desc = cmp.file[0].desc;
-          else if ((cmp.file[1].desc = open (cmp.file[1].name, oflags, 0)) < 0)
-            {
-              perror_with_name (cmp.file[1].name);
-              status = EXIT_TROUBLE;
-            }
+	  else
+	    {
+	      cmp.file[1].desc = open (cmp.file[1].name, oflags);
+	      if (cmp.file[1].desc < 0)
+		{
+		  perror_with_name (cmp.file[1].name);
+		  status = EXIT_TROUBLE;
+		}
+	    }
         }
 
       /* Compare the files, if no error was found.  */

@@ -77,11 +77,16 @@ static word *buffer[2];
 /* Optimal block size for the files.  */
 static idx_t buf_size;
 
-/* Initial prefix to ignore for each file.  */
-static off_t ignore_initial[2];
+/* Initial prefix to ignore for each file, or negative if the user
+   requested to ignore more than TYPE_MAXIMUM (intmax_t) bytes.  */
+static intmax_t ignore_initial[2];
 
-/* Number of bytes to compare, or -1 if there is no limit.  */
-static intmax_t bytes = -1;
+/* Number of bytes to compare.  INTMAX_MAX is effectively infinity,
+   since there's no practical way on current computers to compare so
+   many bytes.  Even if cmp added SEEK_HOLE and SEEK_DATA optimization,
+   regular files can't have more than TYPE_MAXIMUM (off_t) bytes
+   and special files are unlikely to support this optimization.  */
+static intmax_t bytes = INTMAX_MAX;
 
 /* Output format.  */
 static enum comparison_type
@@ -136,13 +141,14 @@ specify_ignore_initial (int f, char **argptr, char delimiter)
 {
   intmax_t val;
   char const *arg = *argptr;
-  strtol_error e = xstrtoimax (arg, argptr, 0, &val, valid_suffixes);
+  strtol_error d = xstrtoimax (arg, argptr, 0, &val, valid_suffixes);
+  strtol_error e = d & ~LONGINT_OVERFLOW;
   if (! ((e == LONGINT_OK
           || (e == LONGINT_INVALID_SUFFIX_CHAR && **argptr == delimiter))
-         && 0 <= val && val <= TYPE_MAXIMUM (off_t)))
+         && 0 <= val))
     try_help ("invalid --ignore-initial value '%s'", arg);
-  if (ignore_initial[f] < val)
-    ignore_initial[f] = val;
+  if (0 <= ignore_initial[f] && ignore_initial[f] < val)
+    ignore_initial[f] = d == e ? val : -1;
 }
 
 /* Specify the output format.  */
@@ -227,7 +233,7 @@ main (int argc, char **argv)
         specify_ignore_initial (0, &optarg, ':');
         if (*optarg++ == ':')
           specify_ignore_initial (1, &optarg, 0);
-        else if (ignore_initial[1] < ignore_initial[0])
+	else if (ignore_initial[1] < ignore_initial[0] || ignore_initial[0] < 0)
           ignore_initial[1] = ignore_initial[0];
         break;
 
@@ -238,11 +244,10 @@ main (int argc, char **argv)
       case 'n':
         {
           intmax_t n;
-          if (xstrtoimax (optarg, nullptr, 0, &n, valid_suffixes) != LONGINT_OK
-              || n < 0)
+	  strtol_error e = xstrtoimax (optarg, nullptr, 0, &n, valid_suffixes);
+	  if ((e & ~LONGINT_OVERFLOW) != LONGINT_OK || n < 0)
             try_help ("invalid --bytes value '%s'", optarg);
-          if (! (0 <= bytes && bytes < n))
-            bytes = n;
+	  bytes = MIN (bytes, n);
         }
         break;
 
@@ -284,7 +289,7 @@ main (int argc, char **argv)
     {
       /* Two files with the same name and offset are identical.
          But wait until we open the file once, for proper diagnostics.  */
-      if (f && ignore_initial[0] == ignore_initial[1]
+      if (f && 0 <= ignore_initial[0] && ignore_initial[0] == ignore_initial[1]
           && file_name_cmp (file[0], file[1]) == 0)
         return EXIT_SUCCESS;
 
@@ -296,7 +301,7 @@ main (int argc, char **argv)
         }
       else
         {
-          file_desc[f] = open (file[f], O_RDONLY | O_BINARY, 0);
+          file_desc[f] = open (file[f], O_RDONLY | O_BINARY);
 
           if (file_desc[f] < 0)
             {
@@ -320,9 +325,12 @@ main (int argc, char **argv)
 
   if (0 <= stat_buf[0].st_size && 0 <= stat_buf[1].st_size
       && 0 < same_file (&stat_buf[0], &stat_buf[1])
-      && same_file_attributes (&stat_buf[0], &stat_buf[1])
-      && file_position (0) == file_position (1))
-    return EXIT_SUCCESS;
+      && same_file_attributes (&stat_buf[0], &stat_buf[1]))
+    {
+      off_t pos = file_position (0);
+      if (0 <= pos && pos == file_position (1))
+	return EXIT_SUCCESS;
+    }
 
   /* If output is redirected to the null device, we can avoid some of
      the work.  */
@@ -332,28 +340,38 @@ main (int argc, char **argv)
       struct stat outstat, nullstat;
 
       if (fstat (STDOUT_FILENO, &outstat) == 0
+	  && S_ISCHR (outstat.st_mode)
           && stat (NULL_DEVICE, &nullstat) == 0
           && 0 < same_file (&outstat, &nullstat))
         comparison_type = type_no_stdout;
     }
 
-  /* If only a return code is needed,
-     and if both input descriptors are associated with plain files,
+  /* If no output is needed,
+     and both input descriptors are associated with plain files,
+     and the file sizes are nonzero so they are not Linux /proc files,
      conclude that the files differ if they have different sizes
      and if more bytes will be compared than are in the smaller file.  */
 
-  if (comparison_type == type_status
-      && 0 <= stat_buf[0].st_size && S_ISREG (stat_buf[0].st_mode)
-      && 0 <= stat_buf[1].st_size && S_ISREG (stat_buf[1].st_mode))
+  if (type_no_stdout <= comparison_type
+      && 0 < stat_buf[0].st_size && S_ISREG (stat_buf[0].st_mode)
+      && 0 < stat_buf[1].st_size && S_ISREG (stat_buf[1].st_mode))
     {
-      off_t s0 = stat_buf[0].st_size - file_position (0);
-      off_t s1 = stat_buf[1].st_size - file_position (1);
-      if (s0 < 0)
-        s0 = 0;
-      if (s1 < 0)
-        s1 = 0;
-      if (s0 != s1 && (bytes < 0 || MIN (s0, s1) < bytes))
-        exit (EXIT_FAILURE);
+      off_t pos0 = file_position (0);
+      if (0 <= pos0)
+	{
+	  off_t pos1 = file_position (1);
+	  if (0 <= pos1)
+	    {
+	      off_t s0 = stat_buf[0].st_size - pos0;
+	      off_t s1 = stat_buf[1].st_size - pos1;
+	      if (s0 < 0)
+		s0 = 0;
+	      if (s1 < 0)
+		s1 = 0;
+	      if (s0 != s1 && MIN (s0, s1) < bytes)
+		exit (EXIT_FAILURE);
+	    }
+	}
     }
 
   /* Guess a good block size for the files.  */
@@ -397,27 +415,50 @@ cmp (void)
 
   if (comparison_type == type_all_diffs)
     {
-      off_t byte_number_max = (0 <= bytes && bytes <= TYPE_MAXIMUM (off_t)
-			       ? bytes : TYPE_MAXIMUM (off_t));
+      intmax_t byte_number_max = bytes;
 
       for (int f = 0; f < 2; f++)
-        if (0 <= stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
-          {
-            off_t file_bytes = stat_buf[f].st_size - file_position (f);
-            if (file_bytes < byte_number_max)
-              byte_number_max = file_bytes;
-          }
+        if (0 < stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
+	  {
+	    off_t pos = file_position (f);
+	    off_t after_pos = stat_buf[f].st_size - MAX (0, pos);
+	    byte_number_max = MIN (byte_number_max, after_pos);
+	  }
 
       for (offset_width = 1; (byte_number_max /= 10) != 0; offset_width++)
         continue;
     }
 
+  bool eof[2] = { false, false };
+
   for (int f = 0; f < 2; f++)
     {
-      off_t ig = ignore_initial[f];
-      if (ig && file_position (f) == -1)
+      intmax_t ig = ignore_initial[f];
+      if (ig == 0)
+	continue;
+
+      if (0 <= file_position (f))
+	continue;  /* lseek sufficed.  */
+
+      if (! (0 <= ig && ig < TYPE_MAXIMUM (off_t))
+	  && 0 <= stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
         {
-          /* lseek failed; read and discard the ignored initial prefix.  */
+	  /* When ignoring at least TYPE_MAXIMUM (off_t) bytes
+	     of a regular file, pretend to be at end of file,
+	     as lseeking to TYPE_MAXIMUM (off_t) might tickle a kernel bug,
+	     and lseeking to file end would race with a growing file.  */
+	  eof[f] = true;
+	}
+      else if (ig < 0)
+	{
+	  /* Report an error if asked to ignore more than
+	     INTMAX_MAX bytes of a non-regular file,
+	     as the actual number of bytes to ignore is not known.  */
+	  error (EXIT_TROUBLE, EOVERFLOW, "%s", file[f]);
+	}
+      else
+	{
+	  /* Read and discard the ignored initial prefix.  */
           do
             {
               idx_t bytes_to_read = MIN (ig, buf_size);
@@ -430,7 +471,7 @@ cmp (void)
                 }
               ig -= r;
             }
-          while (ig);
+	  while (0 < ig);
         }
     }
 
@@ -441,19 +482,15 @@ cmp (void)
 
   while (true)
     {
-      idx_t bytes_to_read = buf_size;
+      idx_t bytes_to_read = MIN (buf_size, remaining);
+      remaining -= bytes_to_read;
 
-      if (0 <= remaining)
-        {
-          if (remaining < bytes_to_read)
-            bytes_to_read = remaining;
-          remaining -= bytes_to_read;
-        }
-
-      ptrdiff_t read0 = block_read (file_desc[0], buf0, bytes_to_read);
+      ptrdiff_t read0 = (eof[0] ? 0
+			 : block_read (file_desc[0], buf0, bytes_to_read));
       if (read0 < 0)
         error (EXIT_TROUBLE, errno, "%s", file[0]);
-      ptrdiff_t read1 = block_read (file_desc[1], buf1, bytes_to_read);
+      ptrdiff_t read1 = (eof[1] ? 0
+			 : block_read (file_desc[1], buf1, bytes_to_read));
       if (read1 < 0)
         error (EXIT_TROUBLE, errno, "%s", file[1]);
 
@@ -673,7 +710,7 @@ count_newlines (char *buf, idx_t bufsize)
 static void
 sprintc (char *buf, unsigned char c)
 {
-  if (! isprint (c))
+  if (! c_isprint (c))
     {
       if (c >= 128)
         {
@@ -698,18 +735,24 @@ sprintc (char *buf, unsigned char c)
 }
 
 /* Position file F to ignore_initial[F] bytes from its initial position,
-   and yield its new position.  Don't try more than once.  */
+   and yield its new position.  Return -1 on failure.
+   Don't try more than once.  */
 
 static off_t
 file_position (int f)
 {
+  /* The initial position of input file F, and whether that position has
+     been determined.  The position is -1 if it could not be determined.  */
   static bool positioned[2];
   static off_t position[2];
 
   if (! positioned[f])
     {
       positioned[f] = true;
-      position[f] = lseek (file_desc[f], ignore_initial[f], SEEK_CUR);
+      off_t pos = ignore_initial[f];
+      position[f] = (0 <= pos && pos <= TYPE_MAXIMUM (off_t)
+		     ? lseek (file_desc[f], pos, SEEK_CUR)
+		     : -1);
     }
   return position[f];
 }

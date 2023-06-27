@@ -35,4 +35,9 @@ printf 'diff\0--brief\0/proc/self/cmdline\0bin\0' > bin || framework_failure_
 diff --brief /proc/self/cmdline bin > out 2>&1 || fail=1
 compare /dev/null out || fail=1
 
+# Similarly for cmp -s.
+printf 'cmp\0-s\0/proc/self/cmdline\0bin\0' > bin || framework_failure_
+cmp -s /proc/self/cmdline bin > out 2>&1 || fail=1
+compare /dev/null out || fail=1
+
 Exit $fail
