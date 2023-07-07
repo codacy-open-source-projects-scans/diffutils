@@ -1212,14 +1212,38 @@ lines_differ (char const *s1, char const *s2)
           if (c1 != c2)
             break;
         }
-      if (c1 == '\n')
-        return false;
 
-      column++;
-      if (c1 == '\t' || column == tabsize)
+      switch (c1)
 	{
+	case '\n':
+	  return false;
+
+	case '\r':
+	  tab = column = 0;
+	  break;
+
+	case '\b':
+	  if (0 < column)
+	    column--;
+	  else if (0 < tab)
+	    {
+	      tab--;
+	      column = tabsize - 1;
+	    }
+	  break;
+
+	case '\0': case '\a': case '\f': case '\v':
+	  break;
+
+	default:
+	  column++;
+	  if (column < tabsize)
+	    break;
+	  FALLTHROUGH;
+	case '\t':
 	  tab++;
 	  column = 0;
+	  break;
 	}
     }
 
@@ -1397,12 +1421,15 @@ output_1_line (char const *base, char const *limit, char const *flag_format,
               break;
 
             case '\b':
-              column--;
-	      if (column < 0)
+	      if (0 < column)
+		column--;
+	      else if (0 < tab)
 		{
 		  tab--;
 		  column = tab_size - 1;
 		}
+	      else
+		continue;
               putc (c, out);
               break;
 

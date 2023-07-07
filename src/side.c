@@ -66,18 +66,22 @@ tab_from_to (intmax_t from, intmax_t to)
 }
 
 /* Print the text for half an sdiff line.  This means truncate to
-   width observing tabs, and trim a trailing newline.  Return the
-   last column written (not the number of chars).  */
+   OUT_BOUND columns, observing tabs, and trim a trailing newline.
+   Return the presumed column position on the output device after
+   the write (not the number of chars).  */
 
 static intmax_t
 print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
 {
   FILE *out = outfile;
+  /* IN_POSITION is the current column position if we were outputting the
+     entire line, i.e. ignoring OUT_BOUND.  */
   intmax_t in_position = 0;
+  /* OUT_POSITION is the current column position.  It stays <= OUT_BOUND
+     at any moment.  */
   intmax_t out_position = 0;
   char const *text_pointer = line[0];
   char const *text_limit = line[1];
-  mbstate_t mbstate = { 0 };
 
   while (text_pointer < text_limit)
     {
@@ -89,9 +93,11 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
         case '\t':
           {
             intmax_t spaces = tabsize - in_position % tabsize;
+	    intmax_t tabstop;
+	    if (ckd_add (&tabstop, in_position, spaces))
+	      return out_position;
             if (in_position == out_position)
               {
-                intmax_t tabstop = out_position + spaces;
                 if (expand_tabs)
                   {
                     if (out_bound < tabstop)
@@ -106,7 +112,7 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
                       putc (c, out);
                     }
               }
-            in_position += spaces;
+	    in_position = tabstop;
           }
           break;
 
@@ -135,57 +141,98 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
 
         default:
           {
-            char32_t wc;
-            size_t bytes = mbrtoc32 (&wc, tp0, text_limit - tp0, &mbstate);
+	    /* A byte that might start a multibyte character.
+	       Increase TEXT_POINTER, counting columns, until MBSTATE
+	       becomes the initial state again.
 
-            if (0 < bytes && bytes < (size_t) -2)
-              {
-                int width = c32width (wc);
-                if (0 < width)
-                  in_position += width;
-                if (in_position <= out_bound)
-                  {
-                    out_position = in_position;
-                    fwrite (tp0, 1, bytes, stdout);
-                  }
-                text_pointer = tp0 + bytes;
-                break;
-              }
+	       In practice this code is overkill: on realistic platforms
+	       mbrtoc32 never returns (size_t) -3 and always results in
+	       the initial state unless it returns (size_t) -1.
+	       Although handling (size_t) -3 and non initial states
+	       doesn't hurt complexity significantly, do not handle
+	       other theoretical cases that POSIX allows (such as
+	       mbrtoc32 setting wc = '\r') as it's too painful.  */
+
+	    mbstate_t mbstate = { 0 };
+	    text_pointer = tp0;
+
+	    do
+	      {
+		/* The special value mbrtoc23 returns when it sets WC
+		   to a character but consumes no bytes.  This can
+		   happen only in theory.  Return values greater than
+		   this denote encoding errors.  */
+		size_t SUBSEQUENT = (size_t) -3;
+
+		/* Scan one character or encoding error.
+		   BYTES != (size_t) -2 because TEXT_LIMIT[-1] == '\n'.  */
+		char32_t wc;
+		size_t bytes = mbrtoc32 (&wc, text_pointer,
+					 text_limit - text_pointer, &mbstate);
+		if (bytes != SUBSEQUENT)
+		  text_pointer += 0 < bytes && bytes < SUBSEQUENT ? bytes : 1;
+
+		/* Assume encoding errors have print width 1.  */
+		int width = bytes <= SUBSEQUENT ? c32width (wc) : 1;
+		if (0 < width && ckd_add (&in_position, in_position, width))
+		  return out_position;
+
+		/* If past the trailing newline, disgorge it and stop scan.  */
+		if (text_pointer == text_limit)
+		  {
+		    text_pointer--;
+		    break;
+		  }
+
+		if (SUBSEQUENT < bytes)
+		  break;
+	      }
+	    while (! mbsinit (&mbstate));
+
+	    /* If there is room, output the bytes since TP0.  */
+	    if (in_position <= out_bound)
+	      {
+		out_position = in_position;
+		fwrite (tp0, 1, text_pointer - tp0, out);
+	      }
           }
-          FALLTHROUGH;
-        case '\f':
-        case '\v':
-          if (in_position < out_bound)
-            putc (c, out);
           break;
 
-        case ' ': case '!': case '"': case '#': case '%':
+        /* Print width 1.  */
+        case ' ': case '!': case '"': case '#': case '$': case '%':
         case '&': case '\'': case '(': case ')': case '*':
         case '+': case ',': case '-': case '.': case '/':
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         case ':': case ';': case '<': case '=': case '>':
-        case '?':
+        case '?': case '@':
         case 'A': case 'B': case 'C': case 'D': case 'E':
         case 'F': case 'G': case 'H': case 'I': case 'J':
         case 'K': case 'L': case 'M': case 'N': case 'O':
         case 'P': case 'Q': case 'R': case 'S': case 'T':
         case 'U': case 'V': case 'W': case 'X': case 'Y':
         case 'Z':
-        case '[': case '\\': case ']': case '^': case '_':
+        case '[': case '\\': case ']': case '^': case '_': case '`':
         case 'a': case 'b': case 'c': case 'd': case 'e':
         case 'f': case 'g': case 'h': case 'i': case 'j':
         case 'k': case 'l': case 'm': case 'n': case 'o':
         case 'p': case 'q': case 'r': case 's': case 't':
         case 'u': case 'v': case 'w': case 'x': case 'y':
         case 'z': case '{': case '|': case '}': case '~':
-          /* These characters are printable ASCII characters.  */
-          if (in_position++ < out_bound)
-            {
-              out_position = in_position;
-              putc (c, out);
-            }
-          break;
+	  if (ckd_add (&in_position, in_position, 1))
+	    return out_position;
+	  if (in_position <= out_bound)
+	    {
+	      out_position = in_position;
+	      putc (c, out);
+	    }
+	  break;
+
+	/* Print width 0.  */
+	case '\0': case '\a': case '\f': case '\v':
+	  if (in_position <= out_bound)
+	    putc (c, out);
+	  break;
 
         case '\n':
           return out_position;

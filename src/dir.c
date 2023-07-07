@@ -96,8 +96,9 @@ dir_read (struct file_data const *dir, struct dirdata *dirdata)
             continue;
 
           if (data_alloc - data_used < d_size)
-	    dirdata->data = xpalloc (dirdata->data, &data_alloc,
-				     d_size - (data_alloc - data_used), -1, 1);
+	    dirdata->data = data
+	      = xpalloc (data, &data_alloc,
+			 d_size - (data_alloc - data_used), -1, 1);
           memcpy (data + data_used, d_name, d_size);
           data_used += d_size;
           nnames++;

@@ -129,7 +129,7 @@ typedef struct incomplete *word;
 typedef ptrdiff_t lin;
 #define LIN_MAX PTRDIFF_MAX
 #define pI "t"
-verify (LIN_MAX <= IDX_MAX);
+static_assert (LIN_MAX == IDX_MAX);
 
 /* This section contains POSIX-compliant defaults for macros
    that are meant to be overridden by hand in config.h as needed.  */
@@ -206,7 +206,7 @@ verify (LIN_MAX <= IDX_MAX);
 /* Return the floor of the log base 2 of N.  Return -1 if N is zero.  */
 SYSTEM_INLINE int floor_log2 (idx_t n)
 {
-  verify (IDX_MAX <= ULLONG_MAX);
+  static_assert (IDX_MAX <= ULLONG_MAX);
   return ULLONG_WIDTH - 1 - count_leading_zeros_ll (n);
 }
 

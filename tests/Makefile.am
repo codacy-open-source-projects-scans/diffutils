@@ -5,20 +5,24 @@ TESTS = \
   bignum \
   binary \
   brief-vs-stat-zero-kernel-lies \
+  bug-64316 \
   cmp \
   colliding-file-names \
   diff3 \
   excess-slash \
+  expand-tabs \
   help-version	\
   ifdef \
   invalid-re	\
   function-line-vs-leading-space \
   ignore-matching-lines \
+  ignore-tab-expansion \
   label-vs-func	\
   large-subopt \
   new-file \
   no-dereference \
   no-newline-at-eof \
+  side-by-side \
   stdin \
   strcoll-0-names \
   filename-quoting \

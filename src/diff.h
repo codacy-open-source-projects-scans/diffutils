@@ -288,10 +288,10 @@ struct file_data {
     /* Array of pointers to lines in the file.  */
     char const **linbuf;
 
-    /* linbuf_base <= buffered_lines <= valid_lines <= alloc_lines.
-       linebuf[linbuf_base ... buffered_lines - 1] are possibly differing.
-       linebuf[linbuf_base ... valid_lines - 1] contain valid data.
-       linebuf[linbuf_base ... alloc_lines - 1] are allocated.  */
+    /* linbuf_base <= 0 <= buffered_lines <= valid_lines <= alloc_lines.
+       linbuf[0 ... buffered_lines - 1] are possibly differing.
+       linbuf[linbuf_base ... valid_lines - 1] contain valid data.
+       linbuf[linbuf_base ... alloc_lines - 1] are allocated.  */
     lin linbuf_base, buffered_lines, valid_lines, alloc_lines;
 
     /* Pointer to end of prefix of this file to ignore when hashing.  */

@@ -1,0 +1,46 @@
+#!/bin/sh
+# Test side-by-side output with non-ASCII characters.
+
+. "${srcdir=.}/init.sh"; path_prepend_ ../src
+
+fail=0
+
+LC_ALL=en_US.UTF-8
+export LC_ALL
+test "`locale charmap 2>/dev/null`" = UTF-8 \
+  || skip_ "Locale $LC_ALL does not exist"
+
+cat >in1 <<\EOF || framework_failure_
+a
+ab
+abc
+[一天早上，當格雷戈爾·薩姆沙從不安的夢中醒來時，
+ 他發現自己在床上變成了一隻可怕的害蟲。
+]
+EOF
+
+cat >in2 <<\EOF || framework_failure_
+ab
+abcd
+<一天早上，當格雷戈爾·薩姆沙從不安的夢中醒來時，
+ 他發現自己在床上變成了一隻可怕的害蟲。
+>
+EOF
+
+cat >exp <<'EOF' || framework_failure_
+a                    <
+ab                      ab
+abc                  |  abcd
+[一天早上，當格雷戈  |  <一天早上，當格雷戈
+ 他發現自己在床上變      他發現自己在床上變
+]                    |  >
+EOF
+
+# We use option --expand-tabs, because the use of tabs hides horizontal
+# alignment bugs in some situations.
+
+returns_ 1 diff --expand-tabs -y -W 44 in1 in2 >out 2>err || fail=1
+compare exp out || fail=1
+compare /dev/null err || fail=1
+
+Exit $fail

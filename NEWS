@@ -19,6 +19,13 @@ GNU diffutils NEWS                                    -*- outline -*-
     cp /proc/cmdline t; cmp -s /proc/cmdline t || echo files differ
   [bug present since "the beginning"]
 
+  diff -E no longer mishandles some input lines containing '\a', '\b',
+  '\f', '\r', '\v', or '\0'.
+  [bug present since 2.8]
+
+  diff -ly no longer mishandles non-ASCII input
+  [bug#64461 introduced in 2.9]
+
 
 * Noteworthy changes in release 3.10 (2023-05-21) [stable]
 

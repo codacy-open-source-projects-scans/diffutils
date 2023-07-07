@@ -28,7 +28,7 @@
 /* The type of a hash value.  */
 typedef size_t hash_value;
 enum { HASH_VALUE_WIDTH = SIZE_WIDTH };
-verify (! TYPE_SIGNED (hash_value));
+static_assert (! TYPE_SIGNED (hash_value));
 
 /* Rotate a hash value to the left.  */
 static hash_value
@@ -292,7 +292,7 @@ find_and_hash_each_line (struct file_data *current)
         case IGNORE_TAB_EXPANSION_AND_TRAILING_SPACE:
         case IGNORE_TRAILING_SPACE:
           {
-	    intmax_t column = 0;
+	    intmax_t tab = 0, column = 0;
             for (unsigned char c; (c = *p++) != '\n'; )
               {
                 if (ig_white_space & IGNORE_TRAILING_SPACE
@@ -318,18 +318,28 @@ find_and_hash_each_line (struct file_data *current)
                   switch (c)
                     {
                     case '\b':
-		      column = (column ? column : tabsize) - 1;
+		      if (0 < column)
+			column--;
+		      else if (0 < tab)
+			{
+			  tab--;
+			  column = tabsize - 1;
+			}
                       break;
 
                     case '\t':
                       c = ' ';
                       repetitions = tabsize - column % tabsize;
+		      tab += column / tabsize + 1;
 		      column = 0;
                       break;
 
                     case '\r':
-                      column = 0;
+		      tab = column = 0;
                       break;
+
+		    case '\0': case '\a': case '\f': case '\v':
+		      break;
 
                     default:
                       column++;
@@ -381,9 +391,7 @@ find_and_hash_each_line (struct file_data *current)
             /* Create a new equivalence class in this bucket.  */
             i = eqs_index++;
             if (i == eqs_alloc)
-	      eqs = xpalloc (eqs, &eqs_alloc, 1,
-			     LIN_MAX < PTRDIFF_MAX ? LIN_MAX : -1,
-			     sizeof *eqs);
+	      eqs = xpalloc (eqs, &eqs_alloc, 1, -1, sizeof *eqs);
             eqs[i].next = *bucket;
             eqs[i].hash = h;
             eqs[i].line = ip;
@@ -417,13 +425,10 @@ find_and_hash_each_line (struct file_data *current)
       /* Maybe increase the size of the line table.  */
       if (line == alloc_lines)
         {
-	  idx_t eqs_max = MIN (LIN_MAX, IDX_MAX / sizeof *cureqs);
-
 	  /* Grow (alloc_lines - linbuf_base) by adding to alloc_lines.  */
 	  idx_t n = alloc_lines - linbuf_base;
           linbuf += linbuf_base;
-	  linbuf = xpalloc (linbuf, &n, 1, eqs_max - linbuf_base,
-			    sizeof *linbuf);
+	  linbuf = xpalloc (linbuf, &n, 1, -1, sizeof *linbuf);
           linbuf -= linbuf_base;
 	  alloc_lines = linbuf_base + n;
           cureqs = xirealloc (cureqs, alloc_lines * sizeof *cureqs);
@@ -445,8 +450,7 @@ find_and_hash_each_line (struct file_data *current)
 	  /* Grow (alloc_lines - linbuf_base) by adding to alloc_lines.  */
 	  idx_t n = alloc_lines - linbuf_base;
 	  linbuf += linbuf_base;
-	  linbuf = xpalloc (linbuf, &n, 1, MAX (0, IDX_MAX - linbuf_base),
-			    sizeof *linbuf);
+	  linbuf = xpalloc (linbuf, &n, 1, -1, sizeof *linbuf);
 	  linbuf -= linbuf_base;
 	  alloc_lines = n - linbuf_base;
         }
@@ -754,7 +758,7 @@ static unsigned char const prime_offset[] =
 
 /* Verify that this host's idx_t is not too wide for the above table.  */
 
-verify (PTRDIFF_WIDTH - 1 <= sizeof prime_offset);
+static_assert (PTRDIFF_WIDTH - 1 <= sizeof prime_offset);
 
 /* Given a vector of two file_data objects, read the file associated
    with each one, and build the table of equivalence classes.
