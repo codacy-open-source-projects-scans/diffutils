@@ -3,6 +3,9 @@
 @setfilename diffutils.info
 @include version.texi
 @settitle Comparing and Merging Files
+@documentencoding UTF-8
+@set txicodequoteundirected
+@set txicodequotebacktick
 @syncodeindex vr cp
 @setchapternewpage odd
 @comment %**end of header
@@ -388,11 +391,41 @@ line against each regular expression.
 @section Suppressing Case Differences
 @cindex case difference suppression
 
-GNU @command{diff} can treat lower case letters as
-equivalent to their upper case counterparts, so that, for example, it
+GNU @command{diff} can treat capital letters as
+equivalent to their small counterparts, so that, for example, it
 considers @samp{Funky Stuff}, @samp{funky STUFF}, and @samp{fUNKy
 stuFf} to all be the same.  To request this, use the @option{-i} or
 @option{--ignore-case} option.
+
+When ignoring case @command{diff} downcases each character before comparing it.
+For example, @samp{diff -i} downcases Greek capital ``Δ'' to small
+``δ'' before comparison.  Although this works for many cases, it may
+have problems in some.  For example:
+
+@itemize @bullet
+@item
+The German word ``Straße'' is not treated like ``STRASSE'' as
+many Germans might expect, because the two words downcase to
+``straße'' and ``strasse'' respectively.
+
+@item
+The Greek name ``Κως'' is not treated like ``ΚΩΣ''
+even though they both end in sigma,
+because the latter's trailing ``Σ'' (U+03A3 GREEK CAPITAL LETTER SIGMA)
+downcases to ``σ'' (U+03C3 GREEK SMALL LETTER SIGMA) instead
+of to ``ς'' (U+03C2 GREEK SMALL LETTER FINAL SIGMA).
+
+@c pdftex cannot handle combining characters, alas.
+@ifnottex
+@item
+The ancient Greek phrase ``Πάντα ῥεῖ'' is not treated like ``ΠΆΝΤΑ ῬΕΙ͂'',
+as the former's trailing ``ῖ'' is the single character U+1FD6 (GREEK
+SMALL LETTER IOTA WITH PERISPOMENI) whereas the latter's trailing
+``Ι͂'' has two characters, U+0399 (GREEK CAPITAL LETTER IOTA) and
+U+0342 (COMBINING GREEK PERISPOMENI).
+@end ifnottex
+
+@end itemize
 
 @node Brief
 @section Summarizing Which Files Differ
@@ -1737,7 +1770,7 @@ output formats (@pxref{Output Formats}) @command{diff} cannot
 represent an incomplete line, so it pretends there was a newline and
 reports an error.
 
-For example, suppose @file{F} and @file{G} are one-byte files that
+For example, suppose @file{F} and @file{G} are one-character files that
 contain just @samp{f} and @samp{g}, respectively.  Then @samp{diff F G}
 outputs
 
@@ -4603,39 +4636,37 @@ handle some of the existing formats.  These shortcomings motivate the
 following suggested projects.
 
 @menu
-* Internationalization:: Handling multibyte and varying-width characters.
+* Internationalization:: Handling multi-byte and varying-width characters.
 * Changing Structure::   Handling changes to the directory structure.
 * Special Files::        Handling symbolic links, device special files, etc.
 * Unusual File Names::   Handling file names that contain unusual characters.
-* Timestamp Order::     Outputting diffs in timestamp order.
+* Timestamp Order::      Outputting diffs in timestamp order.
 * Ignoring Changes::     Ignoring certain changes while showing others.
 * Speedups::             Improving performance.
 @end menu
 
 @node Internationalization
-@subsection Handling Multibyte and Varying-Width Characters
-@cindex multibyte characters
+@subsection Handling Multi-byte and Varying-Width Characters
+@cindex multi-byte characters
 @cindex varying-width characters
 
 @command{diff}, @command{diff3} and @command{sdiff} treat each line of
-input as a string of unibyte characters.  This can mishandle multibyte
-characters in some cases.  For example, when asked to ignore spaces,
-@command{diff} does not properly ignore a multibyte space character.
+input as a string of characters and encoding errors, where an
+@dfn{encoding error} is an input byte that is not part of any
+character.  Single-byte and multi-byte characters are supported, along
+with common character encoding systems like UTF-8.  The operating
+system's locale specifies the character encoding, and can be specified
+with the @env{LC_ALL} environment variable.  You can find which
+locales are supported on your system by running the shell command
+@samp{locale -a}.
 
-Also, @command{diff} currently assumes that each byte is one column
-wide, and this assumption is incorrect in some locales, e.g., locales
-that use UTF-8 encoding.  This causes problems with the @option{-y} or
-@option{--side-by-side} option of @command{diff}.
+When counting columns for options like @option{--expand-tabs} (@option{-t}),
+@command{diff} consults the locale for the column width of each character,
+and assumes that each encoding error occupies a single column.
 
-These problems need to be fixed without unduly affecting the
-performance of the utilities in unibyte environments.
-
-The IBM GNU/Linux Technology Center Internationalization Team has
-proposed
-@uref{http://oss.software.ibm.com/developer/opensource/linux/patches/i18n/diffutils-2.7.2-i18n-0.1.patch.gz,patches
-to support internationalized @command{diff}}.
-Unfortunately, these patches are incomplete and are to an older
-version of @command{diff}, so more work needs to be done in this area.
+When ignoring case for @option{--ignore-case} (@option{-i}),
+@command{diff} downcases each character before comparing it,
+regardless of whether it is multi-byte.  @xref{Case Folding}.
 
 @node Changing Structure
 @subsection Handling Changes to the Directory Structure

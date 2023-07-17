@@ -15,6 +15,7 @@ TESTS = \
   ifdef \
   invalid-re	\
   function-line-vs-leading-space \
+  ignore-case \
   ignore-matching-lines \
   ignore-tab-expansion \
   label-vs-func	\

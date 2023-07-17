@@ -22,7 +22,7 @@
 
 #include "diff.h"
 
-#include <uchar.h>
+#include <mbcel.h>
 
 static void print_sdiff_common_lines (lin, lin);
 static void print_sdiff_hunk (struct change *);
@@ -142,59 +142,21 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
         default:
           {
 	    /* A byte that might start a multibyte character.
-	       Increase TEXT_POINTER, counting columns, until MBSTATE
-	       becomes the initial state again.
-
-	       In practice this code is overkill: on realistic platforms
-	       mbrtoc32 never returns (size_t) -3 and always results in
-	       the initial state unless it returns (size_t) -1.
-	       Although handling (size_t) -3 and non initial states
-	       doesn't hurt complexity significantly, do not handle
-	       other theoretical cases that POSIX allows (such as
-	       mbrtoc32 setting wc = '\r') as it's too painful.  */
-
-	    mbstate_t mbstate = { 0 };
-	    text_pointer = tp0;
-
-	    do
-	      {
-		/* The special value mbrtoc23 returns when it sets WC
-		   to a character but consumes no bytes.  This can
-		   happen only in theory.  Return values greater than
-		   this denote encoding errors.  */
-		size_t SUBSEQUENT = (size_t) -3;
-
-		/* Scan one character or encoding error.
-		   BYTES != (size_t) -2 because TEXT_LIMIT[-1] == '\n'.  */
-		char32_t wc;
-		size_t bytes = mbrtoc32 (&wc, text_pointer,
-					 text_limit - text_pointer, &mbstate);
-		if (bytes != SUBSEQUENT)
-		  text_pointer += 0 < bytes && bytes < SUBSEQUENT ? bytes : 1;
-
-		/* Assume encoding errors have print width 1.  */
-		int width = bytes <= SUBSEQUENT ? c32width (wc) : 1;
-		if (0 < width && ckd_add (&in_position, in_position, width))
-		  return out_position;
-
-		/* If past the trailing newline, disgorge it and stop scan.  */
-		if (text_pointer == text_limit)
-		  {
-		    text_pointer--;
-		    break;
-		  }
-
-		if (SUBSEQUENT < bytes)
-		  break;
-	      }
-	    while (! mbsinit (&mbstate));
+	       Increase TEXT_POINTER, counting columns.
+	       Assume encoding errors have print width 1.  */
+	    mbcel_t g = mbcel_scan (tp0, text_limit);
+	    int width = g.err ? 1 : c32width (g.ch);
+	    if (0 < width && ckd_add (&in_position, in_position, width))
+	      return out_position;
 
 	    /* If there is room, output the bytes since TP0.  */
 	    if (in_position <= out_bound)
 	      {
 		out_position = in_position;
-		fwrite (tp0, 1, text_pointer - tp0, out);
+		fwrite (tp0, 1, g.len, out);
 	      }
+
+	    text_pointer = tp0 + g.len;
           }
           break;
 

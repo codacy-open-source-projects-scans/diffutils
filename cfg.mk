@@ -78,3 +78,5 @@ exclude_file_name_regexp--sc_prohibit_doubled_word = ^tests/y2038-vs-32bit$$
 
 # Tell gnulib's tight_scope rule that we mark externs with XTERN
 export _gl_TS_extern = extern|XTERN|DIFF_INLINE|SYSTEM_INLINE
+
+exclude_file_name_regexp--sc_GPL_version = ^lib/mbcel\.h$$

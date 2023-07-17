@@ -78,6 +78,9 @@ lib/stdopen.[ch]
 lib/string.h
 lib/strings.h
 lib/time.h
+lib/unicase.h
+lib/unictype.h
+lib/uninorm.h
 lib/unistd.h
 lib/unistr/
 lib/unistr.h

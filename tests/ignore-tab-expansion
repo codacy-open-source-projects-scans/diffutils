@@ -13,4 +13,16 @@ for p in '\b' '\r' '\t ' '\n'; do
   compare /dev/null out || fail=1
 done
 
+require_utf8_locale_
+
+tr '_@' ' \t' >a <<\EOF
+@字字字xx@x_@字_@xxx_x@@x
+EOF
+tr '_@' ' \t' >b <<\EOF
+_@字字字xx________x_@字_@xxx_x@@x
+EOF
+
+diff -E a b >out || fail=1
+compare /dev/null out || fail=1
+
 Exit $fail

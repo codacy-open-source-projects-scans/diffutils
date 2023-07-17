@@ -2,6 +2,17 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Improvements
+
+  diff's --ignore-case (-i) option now supports multi-byte characters.
+  For example, it treats Greek capital Δ like small δ when input
+  uses UTF-8.
+
+  diff now supports multi-byte characters when treating white space.
+  In options like --ignore-space-change (-b) and
+  --ignore-tab-expansion (-E), diff now recognizes non-ASCII space
+  characters and counts columns for other non-ASCII characters.
+
 ** Bug fixes
 
   cmp -bl no longer omits "M-" from bytes with the high bit set in
