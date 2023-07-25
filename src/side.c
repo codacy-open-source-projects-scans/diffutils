@@ -37,10 +37,11 @@ print_sdiff_script (struct change *script)
 {
   begin_output ();
 
-  next0 = next1 = - files[0].prefix_lines;
+  next0 = next1 = - curr.file[0].prefix_lines;
   print_script (script, find_change, print_sdiff_hunk);
 
-  print_sdiff_common_lines (files[0].valid_lines, files[1].valid_lines);
+  print_sdiff_common_lines (curr.file[0].valid_lines,
+			    curr.file[1].valid_lines);
 }
 
 /* Tab from column FROM to column TO, where FROM <= TO.  Yield TO.  */
@@ -275,13 +276,13 @@ print_sdiff_common_lines (lin limit0, lin limit1)
       if (!left_column)
         {
           while (i0 != limit0 && i1 != limit1)
-            print_1sdiff_line (&files[0].linbuf[i0++], ' ',
-                               &files[1].linbuf[i1++]);
+	    print_1sdiff_line (&curr.file[0].linbuf[i0++], ' ',
+			       &curr.file[1].linbuf[i1++]);
           while (i1 != limit1)
-            print_1sdiff_line (0, ')', &files[1].linbuf[i1++]);
+	    print_1sdiff_line (0, ')', &curr.file[1].linbuf[i1++]);
         }
       while (i0 != limit0)
-        print_1sdiff_line (&files[0].linbuf[i0++], '(', 0);
+	print_1sdiff_line (&curr.file[0].linbuf[i0++], '(', 0);
     }
 
   next0 = limit0;
@@ -315,7 +316,8 @@ print_sdiff_hunk (struct change *hunk)
     {
       lin i, j;
       for (i = first0, j = first1;  i <= last0 && j <= last1;  i++, j++)
-        print_1sdiff_line (&files[0].linbuf[i], '|', &files[1].linbuf[j]);
+	print_1sdiff_line (&curr.file[0].linbuf[i], '|',
+			   &curr.file[1].linbuf[j]);
       changes = (i <= last0 ? OLD : 0) + (j <= last1 ? NEW : 0);
       next0 = first0 = i;
       next1 = first1 = j;
@@ -326,7 +328,7 @@ print_sdiff_hunk (struct change *hunk)
     {
       lin j;
       for (j = first1; j <= last1; ++j)
-        print_1sdiff_line (0, '>', &files[1].linbuf[j]);
+	print_1sdiff_line (0, '>', &curr.file[1].linbuf[j]);
       next1 = j;
     }
 
@@ -335,7 +337,7 @@ print_sdiff_hunk (struct change *hunk)
     {
       lin i;
       for (i = first0; i <= last0; ++i)
-        print_1sdiff_line (&files[0].linbuf[i], '<', 0);
+	print_1sdiff_line (&curr.file[0].linbuf[i], '<', 0);
       next0 = i;
     }
 }

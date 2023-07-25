@@ -4,9 +4,9 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 ** Improvements
 
-  diff's --ignore-case (-i) option now supports multi-byte characters.
-  For example, it treats Greek capital Δ like small δ when input
-  uses UTF-8.
+  diff's --ignore-case (-i) and --ignore-file-name-case options now
+  support multi-byte characters.  For example, they treat Greek
+  capital Δ like small δ when input uses UTF-8.
 
   diff now supports multi-byte characters when treating white space.
   In options like --ignore-space-change (-b) and
@@ -36,6 +36,10 @@ GNU diffutils NEWS                                    -*- outline -*-
 
   diff -ly no longer mishandles non-ASCII input
   [bug#64461 introduced in 2.9]
+
+  diff - A/B now works correctly when standard input is a directory,
+  by reading a file named B in that directory.
+  [bug present since "the beginning"]
 
 
 * Noteworthy changes in release 3.10 (2023-05-21) [stable]

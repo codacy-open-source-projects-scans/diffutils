@@ -95,7 +95,8 @@ enum output_style
 };
 
 /* True for output styles that are robust,
-   i.e. can handle a file that ends in a non-newline.  */
+   i.e. can handle a file that ends in a non-newline.
+   This is indented unusually to pacify 'make syntax-check'.  */
 DIFF_INLINE bool robust_output_style (enum output_style s)
 {
   return s != OUTPUT_ED && s != OUTPUT_FORWARD_ED;
@@ -275,6 +276,10 @@ struct file_data {
     char const      *name;	/* File name  */
     struct stat     stat;	/* File status */
 
+    /* Directory stream corresponding to DESC, if it has been fdopendir'ed.
+       Null otherwise.  */
+    DIR *dirstream;
+
     /* Buffer in which text of file is read.  */
     word *buffer;
 
@@ -336,17 +341,31 @@ struct file_data {
     lin equiv_max;
 };
 
+/* struct file_data.desc markers */
+enum { NONEXISTENT = -1 }; /* nonexistent file */
+enum { UNOPENED = -2 }; /* unopened file (e.g. directory) */
+
 /* Data on two input files being compared.  */
 
 struct comparison
   {
+    /* The two files.  */
     struct file_data file[2];
-    struct comparison const *parent;  /* parent, if a recursive comparison */
+
+    /* The parent comparison, or &noparent if at the top level.  */
+    struct comparison const *parent;
   };
 
 /* Describe the two files currently being compared.  */
 
-XTERN struct file_data files[2];
+XTERN struct comparison curr;
+
+/* A placeholder for the parent of the top level comparison.
+   Only the desc slots are used; although they are typically AT_FDCWD,
+   one might be nonnegative for a directory at the top level
+   for 'diff DIR FILE' or 'diff FILE DIR'.  */
+
+XTERN struct comparison noparent;
 
 /* Stdio stream to output diffs to.  */
 
@@ -363,10 +382,10 @@ extern void print_context_header (struct file_data[],
 extern void print_context_script (struct change *, bool);
 
 /* dir.c */
-extern int diff_dirs (struct comparison const *,
+extern int diff_dirs (struct comparison *,
                       int (*) (struct comparison const *,
                                char const *, char const *));
-extern char *find_dir_file_pathname (char const *, char const *)
+extern char *find_dir_file_pathname (struct file_data *, char const *)
   ATTRIBUTE_MALLOC ATTRIBUTE_DEALLOC_FREE
   ATTRIBUTE_RETURNS_NONNULL;
 
@@ -395,7 +414,6 @@ extern char const change_letter[4];
 extern char const pr_program[];
 extern lin translate_line_number (struct file_data const *, lin);
 extern struct change *find_change (struct change *);
-extern struct change *find_reverse_change (struct change *);
 extern enum changes analyze_hunk (struct change *, lin *, lin *, lin *, lin *);
 extern void begin_output (void);
 extern void cleanup_signal_handlers (void);

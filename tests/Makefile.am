@@ -24,6 +24,7 @@ TESTS = \
   no-dereference \
   no-newline-at-eof \
   side-by-side \
+  starting-file \
   stdin \
   strcoll-0-names \
   filename-quoting \

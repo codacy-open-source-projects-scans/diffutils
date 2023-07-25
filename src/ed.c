@@ -29,7 +29,8 @@ static void pr_forward_ed_hunk (struct change *);
 void
 print_ed_script (struct change *script)
 {
-  print_script (script, find_reverse_change, print_ed_hunk);
+  /* The script is reversed, so plain find_change suffices.  */
+  print_script (script, find_change, print_ed_hunk);
 }
 
 /* Print a hunk of an ed diff */
@@ -50,7 +51,7 @@ print_ed_hunk (struct change *hunk)
   begin_output ();
 
   /* Print out the line number header for this hunk */
-  print_number_range (',', &files[0], f0, l0);
+  print_number_range (',', &curr.file[0], f0, l0);
   fputc (change_letter[changes], outfile);
   fputc ('\n', outfile);
 
@@ -66,7 +67,8 @@ print_ed_hunk (struct change *hunk)
               fputs ("a\n", outfile);
               insert_mode = true;
             }
-          if (files[1].linbuf[i][0] == '.' && files[1].linbuf[i][1] == '\n')
+	  if (curr.file[1].linbuf[i][0] == '.'
+	      && curr.file[1].linbuf[i][1] == '\n')
             {
               /* The file's line is just a dot, and it would exit
                  insert mode.  Precede the dot with another dot, exit
@@ -75,7 +77,7 @@ print_ed_hunk (struct change *hunk)
               insert_mode = false;
             }
           else
-            print_1_line ("", &files[1].linbuf[i]);
+	    print_1_line ("", &curr.file[1].linbuf[i]);
         }
 
       if (insert_mode)
@@ -107,7 +109,7 @@ pr_forward_ed_hunk (struct change *hunk)
   begin_output ();
 
   fputc (change_letter[changes], outfile);
-  print_number_range (' ', files, f0, l0);
+  print_number_range (' ', &curr.file[0], f0, l0);
   fputc ('\n', outfile);
 
   /* If deletion only, print just the number range.  */
@@ -119,7 +121,7 @@ pr_forward_ed_hunk (struct change *hunk)
      and the lines from file 2.  */
 
   for (lin i = f1; i <= l1; i++)
-    print_1_line ("", &files[1].linbuf[i]);
+    print_1_line ("", &curr.file[1].linbuf[i]);
 
   fputs (".\n", outfile);
 }
@@ -148,7 +150,7 @@ print_rcs_hunk (struct change *hunk)
   begin_output ();
 
   lin tf0, tl0, tf1, tl1;
-  translate_range (&files[0], f0, l0, &tf0, &tl0);
+  translate_range (&curr.file[0], f0, l0, &tf0, &tl0);
 
   if (changes & OLD)
     {
@@ -161,12 +163,12 @@ print_rcs_hunk (struct change *hunk)
   if (changes & NEW)
     {
       /* Take last-line-number from file 0 and # lines from file 1.  */
-      translate_range (&files[1], f1, l1, &tf1, &tl1);
+      translate_range (&curr.file[1], f1, l1, &tf1, &tl1);
       fprintf (outfile, "a%"pI"d %"pI"d\n", tl0,
                tf1 <= tl1 ? tl1 - tf1 + 1 : 1);
 
       /* Print the inserted lines.  */
       for (lin i = f1; i <= l1; i++)
-        print_1_line ("", &files[1].linbuf[i]);
+	print_1_line ("", &curr.file[1].linbuf[i]);
     }
 }

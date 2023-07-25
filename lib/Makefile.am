@@ -30,6 +30,6 @@ noinst_HEADERS =
 include gnulib.mk
 
 noinst_HEADERS += cmpbuf.h mbcel.h
-libdiffutils_a_SOURCES += cmpbuf.c mbcel.c
+libdiffutils_a_SOURCES += cmpbuf.c mbcel.c mbcel-strcasecmp.c
 
 AM_CFLAGS += $(GNULIB_WARN_CFLAGS) $(WERROR_CFLAGS)

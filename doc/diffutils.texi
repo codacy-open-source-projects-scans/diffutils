@@ -1904,6 +1904,10 @@ These adjustments can be applied to any output format.
 @cindex tab stop alignment
 @cindex aligning tab stops
 
+The tab character moves the cursor to the next tab stop.
+Tab stops are normally every 8 display columns;
+this can be altered by the @option{--tabsize=@var{columns}} option.
+
 The lines of text in some of the @command{diff} output formats are
 preceded by one or two characters that indicate whether the text is
 inserted, deleted, or changed.  The addition of those characters can
@@ -1916,9 +1920,7 @@ number of spaces before outputting them; select this method with the
 @option{--expand-tabs} (@option{-t}) option.  To use this form of output with
 @command{patch}, you must give @command{patch} the @option{-l} or
 @option{--ignore-white-space} option (@pxref{Changed White Space}, for more
-information).  @command{diff} normally assumes that tab stops are set
-every 8 print columns, but this can be altered by the
-@option{--tabsize=@var{columns}} option.
+information).
 
 The other method for making tabs line up correctly is to add a tab
 character instead of a space after the indicator character at the
@@ -1930,6 +1932,15 @@ of the screen or the paper.  It also does not work with the unified
 output format, which does not have a space character after the change
 type indicator character.  Select this method with the @option{-T} or
 @option{--initial-tab} option.
+
+GNU @command{diff} currently assumes that the output device respects tab stops,
+displays each character with column width as given by the operating system,
+and displays each encoding error byte in a single column.
+Unfortunately these assumptions are often incorrect
+for encoding errors and non-ASCII characters,
+so complex input data may not line up properly on output,
+and analysis based on the @option{--ignore-tab-expansion} (@option{-E}) option
+may differ from the display device's behavior.
 
 @node Trailing Blanks
 @section Omitting trailing blanks

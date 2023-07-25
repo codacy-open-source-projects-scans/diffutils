@@ -21,9 +21,9 @@
 #define GDIFF_MAIN
 #define SYSTEM_INLINE _GL_EXTERN_INLINE
 #include "diff.h"
-#include <assert.h>
 #include "paths.h"
 #include <c-stack.h>
+#include <careadlinkat.h>
 #include <dirname.h>
 #include <error.h>
 #include <exclude.h>
@@ -36,10 +36,8 @@
 #include <progname.h>
 #include <sh-quote.h>
 #include <stat-time.h>
-#include <timespec.h>
 #include <version-etc.h>
 #include <xalloc.h>
-#include <xreadlink.h>
 #include <xstdopen.h>
 #include <binary-io.h>
 
@@ -730,8 +728,7 @@ main (int argc, char **argv)
 
   if (output_style != OUTPUT_CONTEXT || hard_locale (LC_TIME))
     {
-#if (defined STAT_TIMESPEC || defined STAT_TIMESPEC_NS \
-     || defined HAVE_STRUCT_STAT_ST_SPARE1)
+#if defined STAT_TIMESPEC || defined STAT_TIMESPEC_NS
       time_format = "%Y-%m-%d %H:%M:%S.%N %z";
 #else
       time_format = "%Y-%m-%d %H:%M:%S %z";
@@ -824,6 +821,9 @@ main (int argc, char **argv)
 
   int exit_status = EXIT_SUCCESS;
 
+  noparent.file[0].desc = AT_FDCWD;
+  noparent.file[1].desc = AT_FDCWD;
+
   if (from_file)
     {
       if (to_file)
@@ -831,7 +831,7 @@ main (int argc, char **argv)
       else
         for (; optind < argc; optind++)
           {
-            int status = compare_files (nullptr, from_file, argv[optind]);
+	    int status = compare_files (&noparent, from_file, argv[optind]);
             if (exit_status < status)
               exit_status = status;
           }
@@ -841,7 +841,7 @@ main (int argc, char **argv)
       if (to_file)
         for (; optind < argc; optind++)
           {
-            int status = compare_files (nullptr, argv[optind], to_file);
+	    int status = compare_files (&noparent, argv[optind], to_file);
             if (exit_status < status)
               exit_status = status;
           }
@@ -855,7 +855,8 @@ main (int argc, char **argv)
                 try_help ("extra operand '%s'", argv[optind + 2]);
             }
 
-          exit_status = compare_files (nullptr, argv[optind], argv[optind + 1]);
+	  exit_status = compare_files (&noparent,
+				       argv[optind], argv[optind + 1]);
         }
     }
 
@@ -1053,17 +1054,15 @@ Mandatory arguments to long options are mandatory for short options too.\n\
       else
         {
           char const *msg = _(*p);
-          for (char const *nl; (nl = strchr (msg, '\n')); )
+	  for (char const *nl; (nl = strchr (msg, '\n')); msg = nl + 1)
             {
-              int msglen = nl + 1 - msg;
-              /* This assertion is solely to avoid a warning from
-                 gcc's -Wformat-overflow=.  */
-              assert (msglen < 4096);
-              printf ("  %.*s", msglen, msg);
-              msg = nl + 1;
+	      fputs ("  ", stdout);
+	      fwrite (msg, 1, nl + 1 - msg, stdout);
             }
 
-          printf (&"  %s\n"[2 * (*msg != ' ' && *msg != '-')], msg);
+	  if (*msg == ' ' || *msg == '-')
+	    fputs ("  ", stdout);
+	  puts (msg);
         }
     }
   emit_bug_reporting_address ();
@@ -1109,29 +1108,6 @@ specify_colors_style (char const *value)
 }
 
 
-/* Set the last-modified time of *ST to be the current time.  */
-
-static void
-set_mtime_to_now (struct stat *st)
-{
-#ifdef STAT_TIMESPEC
-  gettime (&STAT_TIMESPEC (st, st_mtim));
-#else
-  struct timespec t;
-  gettime (&t);
-  st->st_mtime = t.tv_sec;
-# if defined STAT_TIMESPEC_NS
-  STAT_TIMESPEC_NS (st, st_mtim) = t.tv_nsec;
-# elif defined HAVE_STRUCT_STAT_ST_SPARE1
-  st->st_spare1 = t.tv_nsec / 1000;
-# endif
-#endif
-}
-
-/* cmp.file[f].desc markers */
-enum { NONEXISTENT = -1 }; /* nonexistent file */
-enum { UNOPENED = -2 }; /* unopened file (e.g. directory) */
-
 /* encoded errno value */
 static int
 errno_encode (int err)
@@ -1155,7 +1131,7 @@ dir_p (struct comparison const *pcmp, int f)
 
 /* Compare two files (or dirs) with parent comparison PARENT
    and names NAME0 and NAME1.
-   (If PARENT is null, then the first name is just NAME0, etc.)
+   (If PARENT == &NOPARENT, then the first name is just NAME0, etc.)
    This is self-contained; it opens the files and closes them.
 
    Value is EXIT_SUCCESS if files are the same, EXIT_FAILURE if
@@ -1199,7 +1175,7 @@ compare_files (struct comparison const *parent,
   char *free0;
   char *free1;
 
-  if (!parent)
+  if (parent == &noparent)
     {
       free0 = nullptr;
       free1 = nullptr;
@@ -1243,17 +1219,19 @@ compare_files (struct comparison const *parent,
                         cmp.file[f].stat.st_size =
                           MAX (0, cmp.file[f].stat.st_size - pos);
                     }
-
-                  /* POSIX 1003.1-2001 requires current time for
-                     stdin.  */
-                  set_mtime_to_now (&cmp.file[f].stat);
                 }
             }
-          else if ((no_dereference_symlinks
-                    ? lstat (cmp.file[f].name, &cmp.file[f].stat)
-                    : stat (cmp.file[f].name, &cmp.file[f].stat))
-                   != 0)
-            cmp.file[f].desc = errno_encode (errno);
+	  else
+	    {
+	      char const *name = cmp.file[f].name;
+	      if (fstatat (parent->file[f].desc,
+			   (parent->file[f].desc < 0 ? name
+			    : last_component (name)),
+			   &cmp.file[f].stat,
+			   no_dereference_symlinks ? AT_SYMLINK_NOFOLLOW : 0)
+		  < 0)
+		cmp.file[f].desc = errno_encode (errno);
+	    }
         }
     }
 
@@ -1270,7 +1248,7 @@ compare_files (struct comparison const *parent,
                && cmp.file[f].stat.st_size == 0)
             : ((cmp.file[f].desc == errno_encode (ENOENT)
                 || cmp.file[f].desc == errno_encode (EBADF))
-               && ! parent
+	       && parent == &noparent
                && (cmp.file[1 - f].desc == UNOPENED
                    || cmp.file[1 - f].desc == STDIN_FILENO))))
       cmp.file[f].desc = NONEXISTENT;
@@ -1295,7 +1273,7 @@ compare_files (struct comparison const *parent,
         }
     }
 
-  if (status == EXIT_SUCCESS && ! parent && !no_directory
+  if (status == EXIT_SUCCESS && !no_directory && parent == &noparent
       && dir_p (&cmp, 0) != dir_p (&cmp, 1))
     {
       /* If one is a directory, and it was specified in the command line,
@@ -1304,17 +1282,21 @@ compare_files (struct comparison const *parent,
       int fnm_arg = dir_p (&cmp, 0);
       int dir_arg = 1 - fnm_arg;
       char const *fnm = cmp.file[fnm_arg].name;
-      char const *dir = cmp.file[dir_arg].name;
+      char const *base_fnm = last_component (fnm);
       char const *filename = cmp.file[dir_arg].name = free0
-        = find_dir_file_pathname (dir, last_component (fnm));
+	= find_dir_file_pathname (&cmp.file[dir_arg], base_fnm);
 
       if (STREQ (fnm, "-"))
         fatal ("cannot compare '-' to a directory");
 
-      if ((no_dereference_symlinks
-           ? lstat (filename, &cmp.file[dir_arg].stat)
-           : stat (filename, &cmp.file[dir_arg].stat))
-          != 0)
+      int dirdesc = cmp.file[dir_arg].desc;
+      cmp.file[dir_arg].desc = UNOPENED;
+      noparent.file[dir_arg].desc = dirdesc < 0 ? AT_FDCWD : dirdesc;
+      if (fstatat (noparent.file[dir_arg].desc,
+		   dirdesc < 0 ? filename : base_fnm,
+		   &cmp.file[dir_arg].stat,
+		   no_dereference_symlinks ? AT_SYMLINK_NOFOLLOW : 0)
+	  < 0)
         {
           perror_with_name (filename);
           status = EXIT_TROUBLE;
@@ -1350,7 +1332,7 @@ compare_files (struct comparison const *parent,
 
       /* If both are directories, compare the files in them.  */
 
-      if (parent && !recursive)
+      if (!recursive && parent != &noparent)
         {
           /* But don't compare dir contents one level down
              unless -r was specified.
@@ -1362,7 +1344,7 @@ compare_files (struct comparison const *parent,
         status = diff_dirs (&cmp, compare_files);
     }
   else if ((dir_p (&cmp, 0) | dir_p (&cmp, 1))
-           || (parent
+	   || (parent != &noparent
                && !((S_ISREG (cmp.file[0].stat.st_mode)
                      || S_ISLNK (cmp.file[0].stat.st_mode))
                     && (S_ISREG (cmp.file[1].stat.st_mode)
@@ -1380,14 +1362,10 @@ compare_files (struct comparison const *parent,
             status = diff_dirs (&cmp, compare_files);
           else
             {
-              char const *dir;
-
-              /* PARENT must be non-null here.  */
-              assert (parent);
-              dir = parent->file[cmp.file[0].desc == NONEXISTENT].name;
-
               /* See POSIX 1003.1-2001 for this format.  */
-              message ("Only in %s: %s\n", dir, name0);
+              message ("Only in %s: %s\n",
+		       parent->file[cmp.file[0].desc == NONEXISTENT].name,
+		       name0);
 
               status = EXIT_FAILURE;
             }
@@ -1410,37 +1388,50 @@ compare_files (struct comparison const *parent,
   else if (S_ISLNK (cmp.file[0].stat.st_mode)
            || S_ISLNK (cmp.file[1].stat.st_mode))
     {
-      /* We get here only if we use lstat(), not stat().  */
-      assert (no_dereference_symlinks);
+      /* We get here only if we are not dereferencing symlinks.  */
+      dassert (no_dereference_symlinks);
 
       if (S_ISLNK (cmp.file[0].stat.st_mode)
           && S_ISLNK (cmp.file[1].stat.st_mode))
         {
           /* Compare the values of the symbolic links.  */
-          char *link_value[2] = { nullptr, nullptr };
+	  if (cmp.file[0].stat.st_size != cmp.file[1].stat.st_size)
+	    status = EXIT_FAILURE;
+	  else
+	    {
+	      char *link_value[2]; link_value[1] = nullptr;
+	      char linkbuf[2][128];
 
-          for (int f = 0; f < 2; f++)
-            {
-              link_value[f] = xreadlink (cmp.file[f].name);
-              if (link_value[f] == nullptr)
-                {
-                  perror_with_name (cmp.file[f].name);
-                  status = EXIT_TROUBLE;
-                  break;
-                }
-            }
-          if (status == EXIT_SUCCESS)
-            {
-              if ( ! STREQ (link_value[0], link_value[1]))
-                {
-                  message ("Symbolic links %s and %s differ\n",
-                           cmp.file[0].name, cmp.file[1].name);
-                  /* This is a difference.  */
-                  status = EXIT_FAILURE;
-                }
-            }
-          for (int f = 0; f < 2; f++)
-            free (link_value[f]);
+	      for (bool f = false; ; f = true)
+		{
+		  int dirfd = parent->file[f].desc;
+		  char const *name = cmp.file[f].name;
+		  char const *nm = dirfd < 0 ? name : last_component (name);
+		  link_value[f] = careadlinkat (dirfd, nm,
+						linkbuf[f], sizeof linkbuf[f],
+						nullptr, readlinkat);
+		  if (!link_value[f])
+		    {
+		      perror_with_name (cmp.file[f].name);
+		      status = EXIT_TROUBLE;
+		      break;
+		    }
+		  if (f)
+		    {
+		      status = (STREQ (link_value[0], link_value[f])
+				? EXIT_SUCCESS : EXIT_FAILURE);
+		      break;
+		    }
+		}
+
+	      for (int f = 0; f < 2; f++)
+		if (link_value[f] != linkbuf[f])
+		  free (link_value[f]);
+	    }
+
+          if (status == EXIT_FAILURE)
+	    message ("Symbolic links %s and %s differ\n",
+		     cmp.file[0].name, cmp.file[1].name);
         }
       else
         {
@@ -1475,51 +1466,44 @@ compare_files (struct comparison const *parent,
 
       /* Open the files and record their descriptors.  */
 
-      int oflags = O_RDONLY | (binary ? O_BINARY : 0);
+      int oflags = (O_RDONLY | (binary ? O_BINARY : 0)
+		    | (no_dereference_symlinks ? O_NOFOLLOW : 0));
 
-      if (cmp.file[0].desc == UNOPENED)
-	{
-	  cmp.file[0].desc = open (cmp.file[0].name, oflags);
-	  if (cmp.file[0].desc < 0)
-	    {
-	      perror_with_name (cmp.file[0].name);
-	      status = EXIT_TROUBLE;
-	    }
-	}
-      if (cmp.file[1].desc == UNOPENED)
-        {
-          if (same_files)
-            cmp.file[1].desc = cmp.file[0].desc;
-	  else
-	    {
-	      cmp.file[1].desc = open (cmp.file[1].name, oflags);
-	      if (cmp.file[1].desc < 0)
-		{
-		  perror_with_name (cmp.file[1].name);
-		  status = EXIT_TROUBLE;
-		}
-	    }
-        }
+      for (int f = 0; f < 2; f++)
+	if (cmp.file[f].desc == UNOPENED)
+	  {
+	    if (f && same_files)
+	      cmp.file[f].desc = cmp.file[0].desc;
+	    else
+	      {
+		int dirfd = parent->file[f].desc;
+		char const *name = cmp.file[f].name;
+		char const *nm = dirfd < 0 ? name : last_component (name);
+		cmp.file[f].desc = openat (dirfd, nm, oflags);
+		if (cmp.file[f].desc < 0)
+		  {
+		    perror_with_name (name);
+		    status = EXIT_TROUBLE;
+		  }
+	      }
+	  }
 
       /* Compare the files, if no error was found.  */
 
       if (status == EXIT_SUCCESS)
         status = diff_2_files (&cmp);
-
-      /* Close the file descriptors.  */
-
-      if (0 <= cmp.file[0].desc && close (cmp.file[0].desc) != 0)
-        {
-          perror_with_name (cmp.file[0].name);
-          status = EXIT_TROUBLE;
-        }
-      if (0 <= cmp.file[1].desc && cmp.file[0].desc != cmp.file[1].desc
-          && close (cmp.file[1].desc) != 0)
-        {
-          perror_with_name (cmp.file[1].name);
-          status = EXIT_TROUBLE;
-        }
     }
+
+
+  /* Close any input files.  */
+  for (int f = 0; f < 2; f++)
+    if ((f == 0 || cmp.file[f].desc != cmp.file[0].desc)
+	&& (cmp.file[f].dirstream ? closedir (cmp.file[f].dirstream) < 0
+	    : 0 <= cmp.file[f].desc && close (cmp.file[f].desc) < 0))
+      {
+	perror_with_name (cmp.file[f].name);
+	status = EXIT_TROUBLE;
+      }
 
   /* Now the comparison has been done, if no error prevented it,
      and STATUS is the value this function will return.  */

@@ -20,13 +20,6 @@
 
 #include <config.h>
 
-/* Use this to suppress gcc's "...may be used before initialized" warnings. */
-#ifdef GCC_LINT
-# define IF_LINT(Code) Code
-#else
-# define IF_LINT(Code) /* empty */
-#endif
-
 #include <count-leading-zeros.h>
 #include <verify.h>
 
@@ -34,6 +27,8 @@
 
 #include <sys/stat.h>
 #include <stat-macros.h>
+#include <stat-time.h>
+#include <timespec.h>
 
 #ifndef STAT_BLOCKSIZE
 # if HAVE_STRUCT_STAT_ST_BLKSIZE
@@ -58,23 +53,12 @@
 #include <stdlib.h>
 #define EXIT_TROUBLE 2
 
+#include <inttypes.h>
 #include <limits.h>
 #include <locale.h>
 #include <stdckdint.h>
 #include <stddef.h>
-#include <inttypes.h>
-
 #include <string.h>
-#if ! HAVE_STRCASECOLL
-# if HAVE_STRICOLL || defined stricoll
-#  define strcasecoll(a, b) stricoll (a, b)
-# else
-#  define strcasecoll(a, b) strcasecmp (a, b) /* best we can do */
-# endif
-#endif
-#if ! (HAVE_STRCASECMP || defined strcasecmp)
-int strcasecmp (char const *, char const *);
-#endif
 
 #include <gettext.h>
 #if ! ENABLE_NLS
@@ -105,6 +89,17 @@ int strcasecmp (char const *, char const *);
 #include <same-inode.h>
 
 #include "version.h"
+
+/* Evaluate an assertion E that is guaranteed to be true.
+   E should not crash, loop forever, or have side effects.  */
+#if defined DDEBUG && !defined NDEBUG
+/* Abort the program if E is false.  */
+# include <assert.h>
+# define dassert(e) assert (e)
+#else
+/* The compiler can assume E, as behavior is undefined otherwise.  */
+# define dassert(e) assume (e)
+#endif
 
 _GL_INLINE_HEADER_BEGIN
 
@@ -185,6 +180,10 @@ static_assert (LIN_MAX == IDX_MAX);
    inspect all attributes, only attributes useful in checking for this
    bug.
 
+   Check first the attributes most likely to differ, for speed.
+   Birthtime is special as st_birthtime is not portable,
+   but when there is a birthtime it is most likely to differ.
+
    It's possible for two distinct files on a buggy file system to have
    the same attributes, but it's not worth slowing down all
    implementations (or complicating the configuration) to cater to
@@ -192,13 +191,16 @@ static_assert (LIN_MAX == IDX_MAX);
 
 #ifndef same_file_attributes
 # define same_file_attributes(s, t) \
-   ((s)->st_mode == (t)->st_mode \
-    && (s)->st_nlink == (t)->st_nlink \
+   (timespec_cmp (get_stat_birthtime (s), get_stat_birthtime (t)) == 0 \
+    && (s)->st_ctime == (t)->st_ctime \
+    && get_stat_ctime_ns (s) == get_stat_ctime_ns (t) \
+    && (s)->st_mtime == (t)->st_mtime \
+    && get_stat_mtime_ns (s) == get_stat_mtime_ns (t) \
+    && (s)->st_size == (t)->st_size \
+    && (s)->st_mode == (t)->st_mode \
     && (s)->st_uid == (t)->st_uid \
     && (s)->st_gid == (t)->st_gid \
-    && (s)->st_size == (t)->st_size \
-    && (s)->st_mtime == (t)->st_mtime \
-    && (s)->st_ctime == (t)->st_ctime)
+    && (s)->st_nlink == (t)->st_nlink)
 #endif
 
 #define STREQ(a, b) (strcmp (a, b) == 0)

@@ -48,9 +48,9 @@ print_normal_hunk (struct change *hunk)
 
   /* Print out the line number header for this hunk */
   set_color_context (LINE_NUMBER_CONTEXT);
-  print_number_range (',', &files[0], first0, last0);
+  print_number_range (',', &curr.file[0], first0, last0);
   fputc (change_letter[changes], outfile);
-  print_number_range (',', &files[1], first1, last1);
+  print_number_range (',', &curr.file[1], first1, last1);
   set_color_context (RESET_CONTEXT);
   fputc ('\n', outfile);
 
@@ -60,9 +60,9 @@ print_normal_hunk (struct change *hunk)
       for (lin i = first0; i <= last0; i++)
         {
           set_color_context (DELETE_CONTEXT);
-          print_1_line_nl ("<", &files[0].linbuf[i], true);
+	  print_1_line_nl ("<", &curr.file[0].linbuf[i], true);
           set_color_context (RESET_CONTEXT);
-          if (files[0].linbuf[i + 1][-1] == '\n')
+	  if (curr.file[0].linbuf[i + 1][-1] == '\n')
             putc ('\n', outfile);
         }
     }
@@ -76,9 +76,9 @@ print_normal_hunk (struct change *hunk)
       for (lin i = first1; i <= last1; i++)
         {
           set_color_context (ADD_CONTEXT);
-          print_1_line_nl (">", &files[1].linbuf[i], true);
+	  print_1_line_nl (">", &curr.file[1].linbuf[i], true);
           set_color_context (RESET_CONTEXT);
-          if (files[1].linbuf[i + 1][-1] == '\n')
+	  if (curr.file[1].linbuf[i + 1][-1] == '\n')
             putc ('\n', outfile);
         }
     }

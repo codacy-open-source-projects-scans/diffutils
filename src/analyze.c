@@ -30,8 +30,10 @@
 #define OFFSET lin
 #define OFFSET_MAX LIN_MAX
 #define EXTRA_CONTEXT_FIELDS /* none */
-#define NOTE_DELETE(c, x) (files[0].changed[files[0].realindexes[x]] = true)
-#define NOTE_INSERT(c, y) (files[1].changed[files[1].realindexes[y]] = true)
+#define NOTE_DELETE(c, x) \
+  (curr.file[0].changed[curr.file[0].realindexes[x]] = true)
+#define NOTE_INSERT(c, y) \
+  (curr.file[1].changed[curr.file[1].realindexes[y]] = true)
 #define USE_HEURISTIC
 #include <diffseq.h>
 
@@ -554,8 +556,7 @@ diff_2_files (struct comparison *cmp)
       lin too_expensive = (lin) 1 << ((floor_log2 (diags) >> 1) + 1);
       ctxt.too_expensive = MAX (4096, too_expensive);
 
-      files[0] = cmp->file[0];
-      files[1] = cmp->file[1];
+      curr = *cmp;
 
       compareseq (0, cmp->file[0].nondiscarded_lines,
                   0, cmp->file[1].nondiscarded_lines, minimal, &ctxt);
@@ -613,7 +614,7 @@ diff_2_files (struct comparison *cmp)
                  to be used if and when we have some output to print.  */
               setup_output (file_label[0] ? file_label[0] : cmp->file[0].name,
                             file_label[1] ? file_label[1] : cmp->file[1].name,
-                            !!cmp->parent);
+			    cmp->parent != &noparent);
 
               switch (output_style)
                 {
@@ -650,7 +651,7 @@ diff_2_files (struct comparison *cmp)
                   break;
 
                 default:
-                  abort ();
+                  unreachable ();
                 }
 
               finish_output ();

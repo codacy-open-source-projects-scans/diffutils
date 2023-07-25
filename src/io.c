@@ -275,33 +275,29 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 		   line 1 and consider it just one space, or nothing at
 		   all if it is at the end of the line.  */
 		if (isspace (c1))
-		  {
-		    while (c1 != '\n')
-		      {
-			c1 = *t1++;
-			if (! isspace (c1))
-			  {
-			    --t1;
-			    c1 = ' ';
-			    break;
-			  }
-		      }
-		  }
+		  while (c1 != '\n')
+		    {
+		      c1 = *t1++;
+		      if (! isspace (c1))
+			{
+			  --t1;
+			  c1 = ' ';
+			  break;
+			}
+		    }
 
 		/* Likewise for line 2.  */
 		if (isspace (c2))
-		  {
-		    while (c2 != '\n')
-		      {
-			c2 = *t2++;
-			if (! isspace (c2))
-			  {
-			    --t2;
-			    c2 = ' ';
-			    break;
-			  }
-		      }
-		  }
+		  while (c2 != '\n')
+		    {
+		      c2 = *t2++;
+		      if (! isspace (c2))
+			{
+			  --t2;
+			  c2 = ' ';
+			  break;
+			}
+		    }
 
 		if (c1 != c2)
 		  {
@@ -476,37 +472,33 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 		     line 1 and consider it just one space, or nothing at
 		     all if it is at the end of the line.  */
 		  if (c32isspace (ch1))
-		    {
-		      while (ch1 != '\n')
-			{
-			  g1 = mbcel_scan (t1, lim1);
-			  t1 += g1.len;
-			  ch1 = g1.ch;
-			  if (! c32isspace (ch1))
-			    {
-			      t1 -= g1.len;
-			      ch1 = ' ';
-			      break;
-			    }
-			}
-		    }
+		    while (ch1 != '\n')
+		      {
+			g1 = mbcel_scan (t1, lim1);
+			t1 += g1.len;
+			ch1 = g1.ch;
+			if (! c32isspace (ch1))
+			  {
+			    t1 -= g1.len;
+			    ch1 = ' ';
+			    break;
+			  }
+		      }
 
 		  /* Likewise for line 2.  */
 		  if (c32isspace (ch2))
-		    {
-		      while (ch2 != '\n')
-			{
-			  g2 = mbcel_scan (t2, lim2);
-			  t2 += g2.len;
-			  ch2 = g2.ch;
-			  if (! c32isspace (ch2))
-			    {
-			      t2 -= g2.len;
-			      ch2 = ' ';
-			      break;
-			    }
-			}
-		    }
+		    while (ch2 != '\n')
+		      {
+			g2 = mbcel_scan (t2, lim2);
+			t2 += g2.len;
+			ch2 = g2.ch;
+			if (! c32isspace (ch2))
+			  {
+			    t2 -= g2.len;
+			    ch2 = ' ';
+			    break;
+			  }
+		      }
 
 		  if (ch1 != ch2)
 		    {

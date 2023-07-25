@@ -49,15 +49,15 @@ static lin next_line1;
 void
 print_ifdef_script (struct change *script)
 {
-  next_line0 = next_line1 = - files[0].prefix_lines;
+  next_line0 = next_line1 = - curr.file[0].prefix_lines;
   print_script (script, find_change, print_ifdef_hunk);
-  if (next_line0 < files[0].valid_lines
-      || next_line1 < files[1].valid_lines)
+  if (next_line0 < curr.file[0].valid_lines
+      || next_line1 < curr.file[1].valid_lines)
     {
       begin_output ();
       format_ifdef (group_format[UNCHANGED],
-                    next_line0, files[0].valid_lines,
-                    next_line1, files[1].valid_lines);
+		    next_line0, curr.file[0].valid_lines,
+		    next_line1, curr.file[1].valid_lines);
     }
 }
 
@@ -99,8 +99,8 @@ format_ifdef (char const *format, lin beg0, lin end0, lin beg1, lin end1)
 {
   format_group (outfile, format, '\0',
 		((struct group const[])
-		 {{.file = &files[0], .from = beg0, .upto = end0},
-		  {.file = &files[1], .from = beg1, .upto = end1}}));
+		 {{.file = &curr.file[0], .from = beg0, .upto = end0},
+		  {.file = &curr.file[1], .from = beg1, .upto = end1}}));
 }
 
 /* Print to file OUT a set of lines according to FORMAT.
@@ -308,7 +308,7 @@ do_printf_spec (FILE *out, char const *spec,
   char c;
 
   /* Scan printf-style SPEC of the form %[-'0]*[0-9]*(.[0-9]*)?[cdoxX].  */
-  /* assert (*f == '%'); */
+  dassert (*f == '%');
   f++;
   while ((c = *f++) == '-' || c == '\'' || c == '0')
     continue;

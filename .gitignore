@@ -51,6 +51,7 @@ lib/config.h
 lib/config.hin
 lib/configmake.h
 lib/ctype.h
+lib/dirent.h
 lib/error.h
 lib/errno.h
 lib/fcntl.h

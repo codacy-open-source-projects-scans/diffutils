@@ -5,7 +5,9 @@
 
 fail=0
 
-cat <<EOF > exp || fail=1
+echo a > a || framework_failure_
+echo b > b || framework_failure_
+cat <<'EOF' > exp || framework_failure_
 --- -
 +++ b
 @@ -1 +1 @@
@@ -13,12 +15,17 @@ cat <<EOF > exp || fail=1
 +b
 EOF
 
-echo a > a
-echo b > b
-
 returns_ 1 diff -u - b < a > out 2> err || fail=1
 # Remove date and time.
-sed -e 's/^\([-+*][-+*][-+*] [^	]*\)	.*/\1/' out > k; mv k out
-compare exp out || fail=1
+sed -e 's/^\([-+*][-+*][-+*] [^	]*\)	.*/\1/' out >outk || framework_failure_
+compare exp outk || fail=1
+compare /dev/null err || fail=1
+
+mkdir d || framework_failure_
+echo a >d/a || framework_failure_
+
+diff -u - a <d >out 2>err || fail=1
+compare /dev/null out || fail=1
+compare /dev/null err || fail=1
 
 Exit $fail

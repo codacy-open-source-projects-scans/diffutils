@@ -169,8 +169,7 @@ print_message_queue (void)
       char const *arg2 = p; p += p < plim ? strlen (p) + 1 : 0;
       char const *arg3 = p; p += p < plim ? strlen (p) + 1 : 0;
       printf (_(m->msgid), arg0, arg1, arg2, arg3);
-      if (p < plim)
-	abort ();
+      dassert (plim <= p);
       struct msg *next = m->next;
       free (m);
       m = next;
@@ -609,7 +608,7 @@ get_funky_string (char **dest, const char **src, bool equals_end,
           break;
 
         default:
-          abort ();
+	  unreachable ();
         }
     }
 
@@ -760,7 +759,7 @@ parse_diff_color (void)
           goto done;
 
         default:
-          abort ();
+	  unreachable ();
         }
     }
  done:
@@ -984,25 +983,15 @@ begin_output (void)
       /* If handling multiple files (because scanning a directory),
          print which files the following output is about.  */
       if (currently_recursive)
-        printf ("%s\n", name);
+        puts (name);
     }
 
   free (name);
 
   /* A special header is needed at the beginning of context output.  */
-  switch (output_style)
-    {
-    case OUTPUT_CONTEXT:
-      print_context_header (files, (char const *const *)names, false);
-      break;
-
-    case OUTPUT_UNIFIED:
-      print_context_header (files, (char const *const *)names, true);
-      break;
-
-    default:
-      break;
-    }
+  if (output_style == OUTPUT_CONTEXT || output_style == OUTPUT_UNIFIED)
+    print_context_header (curr.file, (char const *const *) names,
+			  output_style == OUTPUT_UNIFIED);
 
   if (names[0] != current_name0)
     free (names[0]);
@@ -1054,15 +1043,9 @@ finish_output (void)
    Return the last link before the first gap.  */
 
 struct change * ATTRIBUTE_CONST
-find_change (struct change *start)
+find_change (struct change *script)
 {
-  return start;
-}
-
-struct change * ATTRIBUTE_CONST
-find_reverse_change (struct change *start)
-{
-  return start;
+  return script;
 }
 
 /* Divide SCRIPT into pieces by calling HUNKFUN and
@@ -1294,7 +1277,7 @@ set_color_context (enum color_context color_context)
           break;
 
         default:
-          abort ();
+          unreachable ();
         }
       put_indicator (&color_indicator[C_RIGHT]);
       last_context = color_context;
@@ -1377,8 +1360,9 @@ analyze_hunk (struct change *hunk,
   bool skip_leading_white_space =
     skip_white_space && IGNORE_SPACE_CHANGE <= ignore_white_space;
 
-  char const *const *linbuf0 = files[0].linbuf;  /* Help the compiler.  */
-  char const *const *linbuf1 = files[1].linbuf;
+  /* Help the compiler.  */
+  char const *const *linbuf0 = curr.file[0].linbuf;
+  char const *const *linbuf1 = curr.file[1].linbuf;
 
   lin show_from = 0, show_to = 0;
 
