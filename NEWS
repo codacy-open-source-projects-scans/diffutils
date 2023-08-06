@@ -41,6 +41,10 @@ GNU diffutils NEWS                                    -*- outline -*-
   by reading a file named B in that directory.
   [bug present since "the beginning"]
 
+  diff no longer suffers from race conditions in some cases
+  when comparing files in a mutating file system.
+  [bug present since "the beginning"]
+
 
 * Noteworthy changes in release 3.10 (2023-05-21) [stable]
 

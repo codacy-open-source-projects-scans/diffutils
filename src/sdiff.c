@@ -595,9 +595,9 @@ main (int argc, char *argv[])
         = expand_name (argv[optind], leftdir, argv[optind + 1]);
       char const *rname
         = expand_name (argv[optind + 1], rightdir, argv[optind]);
-      FILE *left = ck_fopen (lname, "r");
-      FILE *right = ck_fopen (rname, "r");
-      FILE *out = ck_fopen (output, "w");
+      FILE *left = ck_fopen (lname, "re");
+      FILE *right = ck_fopen (rname, "re");
+      FILE *out = ck_fopen (output, "we");
 
       diffarg ("--sdiff-merge-assist");
       diffarg ("--");
@@ -942,7 +942,7 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
 
         case 'e':
           if (tmpname)
-            tmp = fopen (tmpname, "w");
+            tmp = fopen (tmpname, "we");
           else
             {
               int fd = temporary_file ();
@@ -1031,7 +1031,7 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
                               editor_program);
 
           char buf[SDIFF_BUFSIZE];
-          tmp = ck_fopen (tmpname, "r");
+          tmp = ck_fopen (tmpname, "re");
           for (idx_t size;
                (size = ck_fread (buf, SDIFF_BUFSIZE, tmp)) != 0; )
             {

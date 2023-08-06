@@ -21,12 +21,13 @@ lib/c-stack.c
 lib/error.c
 lib/file-type.c
 lib/getopt.c
+lib/openat-die.c
 lib/quotearg.c
 lib/regcomp.c
+lib/version-etc.c
 lib/xalloc-die.c
 lib/xfreopen.c
 lib/xstdopen.c
-lib/version-etc.c
 
 src/analyze.c
 src/cmp.c

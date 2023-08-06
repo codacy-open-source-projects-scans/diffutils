@@ -66,8 +66,10 @@ static char const *file[2];
 /* File descriptors of the files.  */
 static int file_desc[2];
 
-/* Status of the files.  If st_size is negative, the status is unknown
-   and st_blksize (if it exists) is just a reasonable guess.  */
+/* Status of the files.  If st_size is -1, stat_buf[i] is valid except
+   that the file size is unspecified.  If st_size is -2, the rest of
+   stat_buf[i] is unspecified except that st_blksize (if it exists) is
+   a reasonable guess.  */
 static struct stat stat_buf[2];
 
 /* Read buffers for the files.  */
@@ -300,7 +302,7 @@ main (int argc, char **argv)
         }
       else
         {
-          file_desc[f] = open (file[f], O_RDONLY | O_BINARY);
+          file_desc[f] = open (file[f], O_RDONLY | O_BINARY | O_CLOEXEC);
 
           if (file_desc[f] < 0)
             {
@@ -312,17 +314,19 @@ main (int argc, char **argv)
 
       if (fstat (file_desc[f], stat_buf + f) < 0)
         {
-          stat_buf[f].st_size = -1;
+	  stat_buf[f].st_size = -2;
 #if HAVE_STRUCT_STAT_ST_BLKSIZE
           stat_buf[f].st_blksize = 8 * 1024;
 #endif
         }
+      else
+	stat_buf[f].st_size = stat_size (&stat_buf[f]);
     }
 
   /* If the files are links to the same inode and have the same file position,
      they are identical.  */
 
-  if (0 <= stat_buf[0].st_size && 0 <= stat_buf[1].st_size
+  if (-1 <= stat_buf[0].st_size && -1 <= stat_buf[1].st_size
       && 0 < same_file (&stat_buf[0], &stat_buf[1])
       && same_file_attributes (&stat_buf[0], &stat_buf[1]))
     {
@@ -352,8 +356,8 @@ main (int argc, char **argv)
      and if more bytes will be compared than are in the smaller file.  */
 
   if (type_no_stdout <= comparison_type
-      && 0 < stat_buf[0].st_size && S_ISREG (stat_buf[0].st_mode)
-      && 0 < stat_buf[1].st_size && S_ISREG (stat_buf[1].st_mode))
+      && 0 <= stat_buf[0].st_size && S_ISREG (stat_buf[0].st_mode)
+      && 0 <= stat_buf[1].st_size && S_ISREG (stat_buf[1].st_mode))
     {
       off_t pos0 = file_position (0);
       if (0 <= pos0)
@@ -421,11 +425,12 @@ cmp (void)
       intmax_t byte_number_max = bytes;
 
       for (int f = 0; f < 2; f++)
-        if (0 < stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
+	if (0 <= stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
 	  {
 	    off_t pos = file_position (f);
-	    off_t after_pos = stat_buf[f].st_size - MAX (0, pos);
-	    byte_number_max = MIN (byte_number_max, after_pos);
+	    if (0 <= pos)
+	      byte_number_max = MIN (byte_number_max,
+				     MAX (0, stat_buf[f].st_size - pos));
 	  }
 
       for (offset_width = 1; (byte_number_max /= 10) != 0; offset_width++)
@@ -446,7 +451,7 @@ cmp (void)
 	continue;  /* lseek sufficed.  */
 
       if (! (0 <= ig && ig < TYPE_MAXIMUM (off_t))
-	  && 0 <= stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
+	  && -1 <= stat_buf[f].st_size && S_ISREG (stat_buf[f].st_mode))
         {
 	  /* When ignoring at least TYPE_MAXIMUM (off_t) bytes
 	     of a regular file, pretend to be at end of file,
@@ -720,7 +725,7 @@ sprintc (char *buf, unsigned char c)
 }
 
 /* Position file F to ignore_initial[F] bytes from its initial position,
-   and yield its new position.  Return -1 on failure.
+   and yield its new position.  Return a negative number on failure.
    Don't try more than once.  */
 
 static off_t

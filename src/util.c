@@ -43,6 +43,12 @@
 #ifndef SA_RESTART
 # define SA_RESTART 0
 #endif
+#ifndef SIGSTOP
+# define SIGSTOP 0
+#endif
+#ifndef SIGTSTP
+# define SIGTSTP 0
+#endif
 
 char const pr_program[] = PR_PROGRAM;
 
@@ -296,7 +302,7 @@ process_signals (void)
    and which of them are actually caught.  */
 static int const sig[] =
   {
-#ifdef SIGTSTP
+#if SIGTSTP
     /* This one is handled specially; see is_tstp_index.  */
     SIGTSTP,
 #endif
@@ -305,7 +311,13 @@ static int const sig[] =
 #ifdef SIGALRM
     SIGALRM,
 #endif
-    SIGHUP, SIGINT, SIGPIPE,
+#ifdef SIGHUP
+    SIGHUP,
+#endif
+    SIGINT,
+#ifdef SIGPIPE
+    SIGPIPE,
+#endif
 #ifdef SIGQUIT
     SIGQUIT,
 #endif
@@ -332,11 +344,7 @@ enum { nsigs = sizeof (sig) / sizeof *(sig) };
 static bool
 is_tstp_index (int j)
 {
-#ifdef SIGTSTP
-  return j == 0;
-#else
-  return false;
-#endif
+  return SIGTSTP && j == 0;
 }
 
 static void

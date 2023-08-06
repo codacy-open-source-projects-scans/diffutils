@@ -27,7 +27,13 @@
 #include <setjmp.h>
 #include <xalloc.h>
 
-/* A sorted vector of file names obtained by reading a directory.  */
+#ifndef HAVE_STRUCT_DIRENT_D_TYPE
+# define HAVE_STRUCT_DIRENT_D_TYPE false
+#endif
+
+/* A sorted vector of file names obtained by reading a directory.
+   If HAVE_STRUCT_DIRENT_D_TYPE, each name is preceded by a byte
+   giving the file type as an enum detype value.  */
 
 struct dirdata
 {
@@ -80,7 +86,7 @@ dir_read (int parentdirfd, struct file_data *dir, struct dirdata *dirdata,
 	  dirfd = openat (parentdirfd,
 			  (parentdirfd < 0 ? dir->name
 			   : last_component (dir->name)),
-			  (O_RDONLY | O_DIRECTORY
+			  (O_RDONLY | O_CLOEXEC | O_DIRECTORY
 			   | (no_dereference_symlinks ? O_NOFOLLOW : 0)));
 	  if (dirfd < 0)
 	    return false;
@@ -108,7 +114,6 @@ dir_read (int parentdirfd, struct file_data *dir, struct dirdata *dirdata,
 	    break;
 
           char *d_name = next->d_name;
-          idx_t d_size = _D_EXACT_NAMLEN (next) + 1;
 
           /* Ignore "." and "..".  */
           if (d_name[0] == '.'
@@ -125,10 +130,31 @@ dir_read (int parentdirfd, struct file_data *dir, struct dirdata *dirdata,
           if (excluded_file_name (excluded, d_name))
             continue;
 
+	  idx_t d_size = HAVE_STRUCT_DIRENT_D_TYPE + _D_EXACT_NAMLEN (next) + 1;
           if (data_alloc - data_used < d_size)
 	    dirdata->data = data
 	      = xpalloc (data, &data_alloc,
 			 d_size - (data_alloc - data_used), -1, 1);
+#if HAVE_STRUCT_DIRENT_D_TYPE
+	  char detype;
+	  switch (next->d_type)
+	    {
+	    case DT_BLK:  detype = DE_BLK;  break;
+	    case DT_CHR:  detype = DE_CHR;  break;
+	    case DT_DIR:  detype = DE_DIR;  break;
+	    case DT_FIFO: detype = DE_FIFO; break;
+	    case DT_LNK:  detype = DE_LNK;  break;
+	    case DT_REG:  detype = DE_REG;  break;
+	    case DT_SOCK: detype = DE_SOCK; break;
+# ifdef DT_WHT
+	    case DT_WHT:  detype = DE_WHT;  break;
+# endif
+	    case DT_UNKNOWN: detype = DE_UNKNOWN; break;
+	    default:         detype = DE_OTHER;   break;
+	    }
+	  data[data_used++] = detype;
+	  d_size--;
+#endif
           memcpy (data + data_used, d_name, d_size);
           data_used += d_size;
           nnames++;
@@ -144,6 +170,7 @@ dir_read (int parentdirfd, struct file_data *dir, struct dirdata *dirdata,
   dirdata->nnames = nnames;
   for (idx_t i = 0; i < nnames; i++)
     {
+      data += HAVE_STRUCT_DIRENT_D_TYPE;
       names[i] = data;
       data += strlen (data) + 1;
     }
@@ -207,20 +234,11 @@ compare_names_for_qsort (void const *file1, void const *file2)
    and pretend it is empty.  Otherwise, update CMP->file[0].desc and
    CMP->file[0].dirstream as needed.  Likewise for CMP->file[1].
 
-   HANDLE_FILE is a caller-provided subroutine called to handle each file.
-   It gets three operands: CMP, name of file in dir 0, name of file in dir 1.
-   These names are relative to the original working directory.
-
-   For a file that appears in only one of the dirs, one of the name-args
-   to HANDLE_FILE is zero.
-
-   Returns the maximum of all the values returned by HANDLE_FILE,
+   Returns the maximum of all the values returned by compare_files,
    or EXIT_TROUBLE if trouble is encountered in opening files.  */
 
 int
-diff_dirs (struct comparison *cmp,
-           int (*handle_file) (struct comparison const *,
-                               char const *, char const *))
+diff_dirs (struct comparison *cmp)
 {
   if ((cmp->file[0].desc == NONEXISTENT || dir_loop (cmp, 0))
       && (cmp->file[1].desc == NONEXISTENT || dir_loop (cmp, 1)))
@@ -243,8 +261,6 @@ diff_dirs (struct comparison *cmp,
 
   if (val == EXIT_SUCCESS)
     {
-      char const **names[2] = {dirdata[0].names, dirdata[1].names};
-
       /* Use locale-specific sorting if possible, else native byte order.  */
       locale_specific_sorting = true;
       if (! ignore_file_name_case)
@@ -253,17 +269,18 @@ diff_dirs (struct comparison *cmp,
 
       /* Sort the directories.  */
       for (int i = 0; i < 2; i++)
-        qsort (names[i], dirdata[i].nnames, sizeof *dirdata[i].names,
+        qsort (dirdata[i].names, dirdata[i].nnames, sizeof *dirdata[i].names,
                compare_names_for_qsort);
 
       /* Loop while files remain in one or both dirs.  */
-      while (*names[0] || *names[1])
+      char const **n0 = dirdata[0].names;
+      char const **n1 = dirdata[1].names;
+      while (*n0 || *n1)
         {
           /* Compare next name in dir 0 with next name in dir 1.
              At the end of a dir,
              pretend the "next name" in that dir is very large.  */
-          int nameorder = (!*names[0] ? 1 : !*names[1] ? -1
-                           : compare_names (*names[0], *names[1]));
+          int nameorder = !*n0 ? 1 : !*n1 ? -1 : compare_names (*n0, *n1);
 
           /* Prefer a file_name_cmp match if available.  This algorithm is
              O(N**2), where N is the number of names in a directory
@@ -271,13 +288,11 @@ diff_dirs (struct comparison *cmp,
              is so small it's not worth tuning.  */
           if (nameorder == 0 && ignore_file_name_case)
             {
-              int raw_order = file_name_cmp (*names[0], *names[1]);
+              int raw_order = file_name_cmp (*n0, *n1);
               if (raw_order != 0)
                 {
-                  int greater_side = raw_order < 0;
-                  int lesser_side = 1 - greater_side;
-                  char const **lesser = names[lesser_side];
-                  char const *greater_name = *names[greater_side];
+                  char const **lesser = raw_order < 0 ? n0 : n1;
+                  char const *greater_name = *(raw_order < 0 ? n1 : n0);
 
                   for (char const **p = lesser + 1;
                        *p && compare_names (*p, greater_name) == 0;
@@ -298,9 +313,12 @@ diff_dirs (struct comparison *cmp,
                 }
             }
 
-          int v1 = (*handle_file) (cmp,
-                                   0 < nameorder ? 0 : *names[0]++,
-                                   nameorder < 0 ? 0 : *names[1]++);
+	  enum detype
+	    detype0 = HAVE_STRUCT_DIRENT_D_TYPE && *n0 ? (*n0)[-1] : DE_UNKNOWN,
+	    detype1 = HAVE_STRUCT_DIRENT_D_TYPE && *n1 ? (*n1)[-1] : DE_UNKNOWN;
+	  int v1 = compare_files (cmp,
+				  0 < nameorder ? nullptr : *n0++, detype0,
+				  nameorder < 0 ? nullptr : *n1++, detype1);
           if (val < v1)
             val = v1;
         }

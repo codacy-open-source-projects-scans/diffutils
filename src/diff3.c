@@ -84,9 +84,6 @@ struct diff_block {
   char **lines[2];		/* The actual lines (may contain nulls) */
   idx_t *lengths[2];		/* Line lengths (including newlines, if any) */
   struct diff_block *next;
-#ifdef GCC_LINT
-  struct diff_block *n2;	/* Used only when freeing.  */
-#endif
 };
 
 /* Three way diff */
@@ -190,7 +187,7 @@ static struct diff3_block *create_diff3_block (lin, lin, lin, lin, lin, lin);
 static struct diff3_block *make_3way_diff (struct diff_block *, struct diff_block *);
 static struct diff3_block *reverse_diff3_blocklist (struct diff3_block *);
 static struct diff3_block *using_to_diff3_block (struct diff_block *[2], struct diff_block *[2], int, int, struct diff3_block const *);
-static struct diff_block *process_diff (char const *, char const *, char **);
+static struct diff_block *process_diff (char const *, char const *);
 static void check_stdout (void);
 static _Noreturn void fatal (char const *);
 static void output_diff3 (FILE *, struct diff3_block *, int const[3], int const[3]);
@@ -226,38 +223,6 @@ static struct option const longopts[] =
   {"version", 0, 0, 'v'},
   {0, 0, 0, 0}
 };
-
-static void
-free_diff_block (struct diff_block *p)
-{
-#ifndef GCC_LINT
-  (void)p;
-#else
-  while (p)
-    {
-      free (p->lines[0]);
-      free (p->lines[1]);
-      free (p->lengths[0]);
-      free (p->lengths[1]);
-      struct diff_block *next = p->n2;
-      free (p);
-      p = next;
-    }
-#endif
-}
-
-/* Copy each next pointer to n2, since make_3way_diff would clobber the former,
-   yet we will still need something to free these buffers.  */
-static void
-next_to_n2 (struct diff_block *p)
-{
-#ifndef GCC_LINT
-  (void)p;
-#else
-  while (p)
-    p = p->n2 = p->next;
-#endif
-}
 
 int
 main (int argc, char **argv)
@@ -411,18 +376,17 @@ main (int argc, char **argv)
      diffs, and output them.  */
 
   char *commonname = file[rev_mapping[FILEC]];
-  char *b0, *b1;
   struct diff_block
-    *thread1 = process_diff (file[rev_mapping[FILE1]], commonname, &b1),
-    *thread0 = process_diff (file[rev_mapping[FILE0]], commonname, &b0);
-
-  next_to_n2 (thread0);
-  next_to_n2 (thread1);
+    *thread1 = process_diff (file[rev_mapping[FILE1]], commonname),
+    *thread0 = process_diff (file[rev_mapping[FILE0]], commonname);
 
   struct diff3_block *diff3 = make_3way_diff (thread0, thread1);
 
-  free_diff_block (thread0);
-  free_diff_block (thread1);
+  /* Although THREAD0 and THREAD1 and some associated storage could
+     now be freed, freeing now is more likely to harm than help, as
+     from here on diff3 merely outputs and exits.  Perhaps some
+     freeing could be done inside process_diff as it processes,
+     though it's low priority to look into this.  */
 
   bool conflicts_found;
 
@@ -432,7 +396,7 @@ main (int argc, char **argv)
                                tag_strings[0], tag_strings[1], tag_strings[2]);
   else if (merge)
     {
-      xfreopen (file[rev_mapping[FILE0]], "r", stdin);
+      xfreopen (file[rev_mapping[FILE0]], "re", stdin);
       conflicts_found
         = output_diff3_merge (stdin, stdout, diff3, mapping, rev_mapping,
                               tag_strings[0], tag_strings[1], tag_strings[2]);
@@ -445,8 +409,6 @@ main (int argc, char **argv)
       conflicts_found = false;
     }
 
-  free (b0);
-  free (b1);
   check_stdout ();
   exit (conflicts_found);
 }
@@ -950,15 +912,13 @@ compare_line_list (char *const list1[], idx_t const lengths1[],
 /* Input and parse two way diffs.  */
 
 static struct diff_block *
-process_diff (char const *filea,
-              char const *fileb,
-              char **buf_to_free)
+process_diff (char const *filea, char const *fileb)
 {
   struct diff_block *block_list;
   struct diff_block **block_list_end = &block_list;
 
-  char *diff_limit = read_diff (filea, fileb, buf_to_free);
-  char *scan_diff = *buf_to_free;
+  char *scan_diff;
+  char *diff_limit = read_diff (filea, fileb, &scan_diff);
 
   while (scan_diff < diff_limit)
     {

@@ -59,32 +59,30 @@ print_context_label (char const *mark,
       else
 	ts = get_stat_mtime (&inf->stat);
 
-      char buf[MAX (INT_STRLEN_BOUND (int) + 32,
-                    INT_STRLEN_BOUND (time_t) + 11)];
+      /* Buffer for nstftime output, big enough to handle any
+	 timestamp formatted according to time_format.
+	 Its size is an upper bound for the format "%Y-%m-%d %H:%M:%S.%N %z",
+	 with an int for year and a time_t for time zone hour.
+	 The format "%Y-%m-%d %H:%M:%S %z" generates fewer bytes,
+	 and although the format "%a %b %e %T %Y" could in theory
+	 generate more bytes in practice it never does.  */
+      char buf[INT_STRLEN_BOUND (int) + INT_STRLEN_BOUND (time_t)
+	       + sizeof "-%m-%d %H:%M:%S.000000000 +00"];
+
       struct tm const *tm = localtime (&ts.tv_sec);
       int nsec = ts.tv_nsec;
-      if (! (tm && nstrftime (buf, sizeof buf, time_format,
-			      tm, localtz, nsec)))
+      if (tm && nstrftime (buf, sizeof buf, time_format, tm, localtz, nsec))
+	fprintf (outfile, "%s %s\t%s", mark, name, buf);
+      else if (TYPE_SIGNED (time_t))
         {
-          static_assert (TYPE_IS_INTEGER (time_t));
-          if (LONG_MIN <= TYPE_MINIMUM (time_t)
-              && TYPE_MAXIMUM (time_t) <= LONG_MAX)
-            {
-              long int sec = inf->stat.st_mtime;
-              sprintf (buf, "%ld.%.9d", sec, nsec);
-            }
-          else if (TYPE_MAXIMUM (time_t) <= INTMAX_MAX)
-            {
-              intmax_t sec = inf->stat.st_mtime;
-              sprintf (buf, "%"PRIdMAX".%.9d", sec, nsec);
-            }
-          else
-            {
-              uintmax_t sec = inf->stat.st_mtime;
-              sprintf (buf, "%"PRIuMAX".%.9d", sec, nsec);
-            }
-        }
-      fprintf (outfile, "%s %s\t%s", mark, name, buf);
+	  intmax_t sec = inf->stat.st_mtime;
+	  fprintf (outfile, "%s %s\t%"PRIdMAX".%.9d", mark, name, sec, nsec);
+	}
+      else
+	{
+	  uintmax_t sec = inf->stat.st_mtime;
+	  fprintf (outfile, "%s %s\t%"PRIuMAX".%.9d", mark, name, sec, nsec);
+	}
     }
   set_color_context (RESET_CONTEXT);
   putc ('\n', outfile);

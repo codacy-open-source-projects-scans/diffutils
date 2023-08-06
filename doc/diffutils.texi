@@ -238,6 +238,7 @@ need not read them to do its job.
 * Case Folding::      Suppressing differences in alphabetic case.
 * Brief::             Summarizing which files are different.
 * Binary::            Comparing binary files or forcing text comparisons.
+* Mutating Files::    Comparing files that are changing while being read.
 @end menu
 
 @node Hunks
@@ -529,6 +530,28 @@ the input files contain a few non-text bytes but otherwise are like
 text files, you can force @command{diff3} to consider all files to be text
 files and compare them line by line by using the @option{-a} or
 @option{--text} option.
+
+@node Mutating Files
+@section Comparing Files While They Are Changing
+@cindex mutating files
+
+Commands like @command{diff} read files and directories by using a
+series of system calls, as operating systems typically do not give a
+program a way to snapshot all its input before processing it.
+If input files change while being read, @command{diff} and related
+commands can generate output that does not correspond to any state of
+the input file system.
+
+For example, if some other process truncates a file to zero size when
+@command{diff} has read just half the file, @command{diff} will use
+the half that it read as its input data.  As another example, if a
+recursive @command{diff} determines that a file is a directory, and
+then some other process replaces the directory with a regular file,
+and then @command{diff} attempts to descend into the directory,
+@command{diff} will issue a diagnostic and fail.
+
+In these situations the output of @command{diff} and related programs
+should be interpreted with some care.
 
 @node Output Formats
 @chapter @command{diff} Output Formats

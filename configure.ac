@@ -122,12 +122,11 @@ if test $gl_gcc_warnings != no; then
 
   AC_SUBST([WARN_CFLAGS])
 
-  AC_DEFINE([GCC_LINT], [1],
-    [Define to 1 if the compiler is checking for lint.])
   AH_VERBATIM([FORTIFY_SOURCE],
   [/* Enable compile-time and run-time bounds-checking, and some warnings,
       without upsetting glibc 2.15+. */
-   #if !defined _FORTIFY_SOURCE && defined __OPTIMIZE__ && __OPTIMIZE__
+   #if !defined _FORTIFY_SOURCE && defined __OPTIMIZE__ && __OPTIMIZE__ \
+       && !defined __MINGW32__
    # define _FORTIFY_SOURCE 2
    #endif
   ])

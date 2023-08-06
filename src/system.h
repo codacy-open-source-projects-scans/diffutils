@@ -101,11 +101,26 @@
 # define dassert(e) assume (e)
 #endif
 
-_GL_INLINE_HEADER_BEGIN
-
-#ifndef SYSTEM_INLINE
+#ifdef SYSTEM_INLINE
+# define SYSTEM_EXTERN
+#else
+# define SYSTEM_EXTERN extern
 # define SYSTEM_INLINE _GL_INLINE
 #endif
+
+#if (defined __linux__ || defined __CYGWIN__ || defined __FreeBSD__ \
+     || defined __NetBSD__ || defined _AIX)
+/* The device number of the /proc file system if known; zero otherwise.  */
+SYSTEM_EXTERN dev_t proc_dev;
+#endif
+
+#if defined __linux__ || defined __ANDROID__
+# include <sys/utsname.h>
+/* 1 if symlink st_size is OK, -1 if not, 0 if unknown yet.  */
+SYSTEM_EXTERN signed char symlink_size_ok;
+#endif
+
+_GL_INLINE_HEADER_BEGIN
 
 /* Type used for fast comparison of several bytes at a time.
    The type is a pointer to an incomplete struct,
@@ -159,6 +174,57 @@ static_assert (LIN_MAX == IDX_MAX);
     (SAME_INODE (*s, *t) \
      || same_special_file (s, t))
 #endif
+
+/* Return the number of bytes in the file described by *S,
+   or -1 if this cannot be determined reliably.  */
+SYSTEM_INLINE off_t stat_size (struct stat *s)
+{
+  mode_t mode = s->st_mode;
+
+#if (defined __linux__ || defined __CYGWIN__ || defined __FreeBSD__ \
+     || defined __NetBSD__ || defined _AIX)
+  /* On some systems, /proc files with size zero are suspect.  */
+  if (S_ISREG (mode) && s->st_size == 0)
+    {
+      if (!proc_dev)
+	{
+	  struct stat st;
+	  st.st_dev = 0;
+	  lstat ("/proc/self", &st);
+	  proc_dev = st.st_dev;
+	}
+      if (proc_dev && s->st_dev == proc_dev)
+	return -1;
+    }
+#endif
+#if defined __linux__ || defined __ANDROID__
+  /* Symlinks have suspect sizes on Linux kernels before 5.15,
+     due to bugs in fscrypt.  */
+  if (S_ISLNK (mode))
+    {
+      if (! symlink_size_ok)
+	{
+	  struct utsname name;
+	  uname (&name);
+	  char *p = name.release;
+	  symlink_size_ok = ((p[1] != '.' || '5' < p[0]
+			      || (p[0] == '5'
+				  && ('1' <= p[2] && p[2] <= '9')
+				  && ('0' <= p[3] && p[3] <= '9')
+				  && ('5' <= p[3]
+				      || ('0' <= p[4] && p[4] <= '9'))))
+			     ? 1 : -1);
+	}
+      if (symlink_size_ok < 0)
+	return -1;
+    }
+#endif
+
+  return (((S_ISREG (mode) || S_ISLNK (mode)
+	    || S_TYPEISSHM (s) || S_TYPEISTMO (s))
+	   && 0 <= s->st_size)
+	  ? s->st_size : -1);
+}
 
 /* Do struct stat *S, *T have the same file attributes?
 

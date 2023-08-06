@@ -269,10 +269,33 @@ struct change
 
 /* Structures that describe the input files.  */
 
+/* Directory entry types.  Like dirent DT_* macros, but portable and
+   safe to use as 'char'.  Use the same values as GNU/Linux, as this
+   may help compilers on that platform.  */
+enum detype
+  {
+    DE_UNKNOWN,
+    DE_FIFO,
+    DE_CHR,
+    DE_DIR = 4,
+    DE_BLK = 6,
+    DE_REG = 8,
+    DE_LNK = 10,
+    DE_SOCK = 12,
+    DE_WHT = 14,
+
+    /* This one is not in GNU/Linux; it means the directory entry
+       type has been determined but is none of the above.  */
+    DE_OTHER
+  };
+
 /* Data on one input file being compared.  */
 
 struct file_data {
     int             desc;	/* File descriptor  */
+    int             openerr;	/* openat errno, or 0  */
+    int             err;	/* openat or fstatat or fstat errno, or 0  */
+    enum detype     detype;	/* Directory entry type or DE_UNKNOWN  */
     char const      *name;	/* File name  */
     struct stat     stat;	/* File status */
 
@@ -341,9 +364,12 @@ struct file_data {
     lin equiv_max;
 };
 
-/* struct file_data.desc markers */
-enum { NONEXISTENT = -1 }; /* nonexistent file */
-enum { UNOPENED = -2 }; /* unopened file (e.g. directory) */
+/* struct file_data.desc markers.
+   A top level parent directory desc can be AT_FDCWD;
+   it is OK if AT_FDCWD is one of these other values.  */
+enum { OPEN_FAILED = -1 }; /* open was attempted but failed */
+enum { NONEXISTENT = -2 }; /* nonexistent file */
+enum { UNOPENED = -3 }; /* unopened file (e.g., file type mismatch) */
 
 /* Data on two input files being compared.  */
 
@@ -381,10 +407,13 @@ extern void print_context_header (struct file_data[],
 				  char const *const *, bool);
 extern void print_context_script (struct change *, bool);
 
+/* diff.c */
+extern int compare_files (struct comparison const *,
+			  char const *, enum detype,
+			  char const *, enum detype);
+
 /* dir.c */
-extern int diff_dirs (struct comparison *,
-                      int (*) (struct comparison const *,
-                               char const *, char const *));
+extern int diff_dirs (struct comparison *);
 extern char *find_dir_file_pathname (struct file_data *, char const *)
   ATTRIBUTE_MALLOC ATTRIBUTE_DEALLOC_FREE
   ATTRIBUTE_RETURNS_NONNULL;
