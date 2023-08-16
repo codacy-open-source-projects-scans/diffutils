@@ -4,6 +4,27 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 ** Improvements
 
+  Programs now quote file names more consistently.
+  For example; "cmp 'none of' /dev/null" now might output
+  "cmp: EOF on ‘none of’ which is empty" instead of outputting
+  "cmp: EOF on none of which is empty".  In diagnostic messages
+  which traditionally omit quotes and where backward compatibility
+  seems to be important, programs continue to omit quotes unless they
+  a file name contains shell metacharacters, in which case programs
+  use shell quoting.  For example, although diff continues to output
+  "Only in a: b" as before for most file names, it now outputs
+  "Only in 'a: b': 'c: d'" instead of "Only in a: b: c: d" because the
+  file names 'a: b' and 'c: d' contain spaces.  Lastly, diff -c and -u
+  headers now quote file names for the shell when needed, instead of
+  using their own idiosyncratic quoting style.
+
+  diff now outputs more information when symbolic links differ, e.g.,
+  "Symbolic links ‘d/f’ -> ‘a’ and ‘e/f’ -> ‘b’ differ", not just
+  "Symbolic links d/f and e/f differ".  Special files too, e.g.,
+  "Character special files ‘d/f’ (1, 3) and ‘e/f’ (5, 0) differ", not
+  "File d/f is a character special file while file e/f is a character
+  special file".
+
   diff's --ignore-case (-i) and --ignore-file-name-case options now
   support multi-byte characters.  For example, they treat Greek
   capital Δ like small δ when input uses UTF-8.

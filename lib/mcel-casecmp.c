@@ -19,17 +19,13 @@
 #include <config.h>
 
 /* Specification.  */
-#include <mbcel.h>
+#include <mcel.h>
 
 #include <ctype.h>
 #include <stdlib.h>
 
-/* Compare the multi-byte strings S1 and S2 lexicographically, ignoring case.
-   Return <0, 0, >0 for <, =, >.  Consider encoding errors to be
-   greater than characters and compare them byte by byte.  */
-
 int
-mbcel_strcasecmp (char const *s1, char const *s2)
+mcel_casecmp (char const *s1, char const *s2)
 {
   char const *p1 = s1;
   char const *p2 = s2;
@@ -39,14 +35,15 @@ mbcel_strcasecmp (char const *s1, char const *s2)
   if (MB_CUR_MAX == 1)
     while (true)
       {
+	static_assert (UCHAR_MAX <= INT_MAX);
 	unsigned char c1 = *p1++;
 	unsigned char c2 = *p2++;
-	int cmp = MBCEL_UCHAR_FITS ? c1 - c2 : _GL_CMP (c1, c2);
+	int cmp = c1 - c2;
 	if (_GL_UNLIKELY (cmp))
 	  {
 	    c1 = tolower (c1);
 	    c2 = tolower (c2);
-	    cmp = MBCEL_UCHAR_FITS ? c1 - c2 : _GL_CMP (c1, c2);
+	    cmp = c1 - c2;
 	  }
 	if (_GL_UNLIKELY (cmp | !c1))
 	  return cmp;
@@ -54,10 +51,10 @@ mbcel_strcasecmp (char const *s1, char const *s2)
   else
     while (true)
       {
-	mbcel_t g1 = mbcel_scanz (p1); p1 += g1.len;
-	mbcel_t g2 = mbcel_scanz (p2); p2 += g2.len;
-	int cmp = mbcel_casecmp (g1, g2);
-	if (_GL_UNLIKELY (cmp | ! (g1.ch | g1.err)))
+	mcel_t g1 = mcel_scanz (p1); p1 += g1.len;
+	mcel_t g2 = mcel_scanz (p2); p2 += g2.len;
+	int cmp = ucore_tocmp (c32tolower, g1.c, g2.c);
+	if (_GL_UNLIKELY (cmp | !g1.c))
 	  return cmp;
       }
 }

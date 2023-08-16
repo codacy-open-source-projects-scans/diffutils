@@ -6,23 +6,23 @@
 fail=0
 
 cat <<EOF > exp- || fail=1
-diff -N -r "a/ " "b/ "
+diff -N -r 'a/ ' 'b/ '
 0a1
 > space
 EOF
 
 cat <<EOF > exp--u || fail=1
-diff -N -r -u "a/ " "b/ "
---- "a/ "
-+++ "b/ "
+diff -N -r -u 'a/ ' 'b/ '
+--- 'a/ '
++++ 'b/ '
 @@ -0,0 +1 @@
 +space
 EOF
 
 cat <<EOF > exp--c || fail=1
-diff -N -r -c "a/ " "b/ "
-*** "a/ "
---- "b/ "
+diff -N -r -c 'a/ ' 'b/ '
+*** 'a/ '
+--- 'b/ '
 ***************
 *** 0 ****
 --- 1 ----
@@ -41,8 +41,8 @@ done
 rm -f "b/ "
 
 cat <<EOF > exp || fail=1
---- "a/\t"
-+++ "b/\001"
+--- 'a/'$'\t'
++++ 'b/'$'\001'
 @@ -1 +1 @@
 -tab
 +one

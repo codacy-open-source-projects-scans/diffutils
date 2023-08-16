@@ -28,21 +28,23 @@
 #include "system.h"
 #include "paths.h"
 
-#include <stdio.h>
-#include <unlocked-io.h>
-
 #include <c-stack.h>
 #include <cmpbuf.h>
+#include <diagnose.h>
 #include <error.h>
 #include <exitfail.h>
 #include <file-type.h>
 #include <getopt.h>
 #include <progname.h>
+#include <quote.h>
 #include <system-quote.h>
+#include <unlocked-io.h>
 #include <version-etc.h>
 #include <xalloc.h>
 #include <xfreopen.h>
 #include <xstdopen.h>
+
+#include <stdio.h>
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 static char const PROGRAM_NAME[] = "diff3";
@@ -192,7 +194,6 @@ static void check_stdout (void);
 static _Noreturn void fatal (char const *);
 static void output_diff3 (FILE *, struct diff3_block *, int const[3], int const[3]);
 static _Noreturn void perror_with_exit (char const *);
-static _Noreturn void try_help (char const *, char const *);
 static void usage (void);
 
 static char const *diff_program = DEFAULT_DIFF_PROGRAM;
@@ -324,9 +325,9 @@ main (int argc, char **argv)
   if (argc - optind != 3)
     {
       if (argc - optind < 3)
-        try_help ("missing operand after '%s'", argv[argc - 1]);
+	try_help ("missing operand after %s", quote (argv[argc - 1]));
       else
-        try_help ("extra operand '%s'", argv[optind + 3]);
+	try_help ("extra operand %s", quote (argv[optind + 3]));
     }
 
   char **file = &argv[optind];
@@ -414,15 +415,6 @@ main (int argc, char **argv)
 }
 
 static void
-try_help (char const *reason_msgid, char const *operand)
-{
-  if (reason_msgid)
-    error (0, 0, _(reason_msgid), operand);
-  error (EXIT_TROUBLE, 0,
-         _("Try '%s --help' for more information."), program_name);
-}
-
-static void
 check_stdout (void)
 {
   if (ferror (stdout))
@@ -461,7 +453,7 @@ static void
 usage (void)
 {
   printf (_("Usage: %s [OPTION]... MYFILE OLDFILE YOURFILE\n"),
-          program_name);
+	  squote (0, program_name));
   printf ("%s\n\n", _("Compare three files line by line."));
 
   fputs (_("\
@@ -929,7 +921,7 @@ process_diff (char const *filea, char const *fileb)
       enum diff_type dt = process_diff_control (&scan_diff, bptr);
       if (dt == DIFF_ERROR || *scan_diff != '\n')
         {
-          fprintf (stderr, _("%s: diff failed: "), program_name);
+	  fprintf (stderr, _("%s: diff failed: "), squote (0, program_name));
           do
             {
               putc (*scan_diff, stderr);
@@ -1222,13 +1214,13 @@ read_diff (char const *filea,
   if (EXIT_TROUBLE <= status)
     error (EXIT_TROUBLE, werrno,
            _(status == 126
-             ? "subsidiary program '%s' could not be invoked"
+	     ? "subsidiary program %s could not be invoked"
              : status == 127
-             ? "subsidiary program '%s' not found"
+	     ? "subsidiary program %s not found"
              : status == INT_MAX
-             ? "subsidiary program '%s' failed"
-             : "subsidiary program '%s' failed (exit status %d)"),
-           diff_program, status);
+	     ? "subsidiary program %s failed"
+	     : "subsidiary program %s failed (exit status %d)"),
+	   quote (diff_program), status);
 
   return diff_result + total;
 }
@@ -1260,7 +1252,7 @@ scan_diff_line (char *scan_ptr, char **set_start, idx_t *set_length,
   if (line_ptr < limit && *line_ptr == '\\')
     {
       if (edscript)
-        fprintf (stderr, "%s:", program_name);
+	fprintf (stderr, "%s:", squote (0, program_name));
       else
         --*set_length;
       line_ptr++;

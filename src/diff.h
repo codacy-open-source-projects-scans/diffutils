@@ -295,8 +295,8 @@ struct file_data {
     int             desc;	/* File descriptor  */
     int             openerr;	/* openat errno, or 0  */
     int             err;	/* openat or fstatat or fstat errno, or 0  */
-    enum detype     detype;	/* Directory entry type or DE_UNKNOWN  */
     char const      *name;	/* File name  */
+    char const      *filetype;	/* file type as untranslated string  */
     struct stat     stat;	/* File status */
 
     /* Directory stream corresponding to DESC, if it has been fdopendir'ed.
@@ -408,9 +408,8 @@ extern void print_context_header (struct file_data[],
 extern void print_context_script (struct change *, bool);
 
 /* diff.c */
-extern int compare_files (struct comparison const *,
-			  char const *, enum detype,
-			  char const *, enum detype);
+extern int compare_files (struct comparison const *, enum detype const[2],
+			  char const *, char const *);
 
 /* dir.c */
 extern int diff_dirs (struct comparison *);

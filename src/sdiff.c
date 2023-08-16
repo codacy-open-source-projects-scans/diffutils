@@ -27,11 +27,13 @@
 
 #include <c-stack.h>
 #include <dirname.h>
+#include <diagnose.h>
 #include <error.h>
 #include <exitfail.h>
 #include <file-type.h>
 #include <getopt.h>
 #include <progname.h>
+#include <quote.h>
 #include <system-quote.h>
 #include <version-etc.h>
 #include <xalloc.h>
@@ -161,15 +163,6 @@ static struct option const longopts[] =
   {0, 0, 0, 0}
 };
 
-static _Noreturn void
-try_help (char const *reason_msgid, char const *operand)
-{
-  if (reason_msgid)
-    error (0, 0, _(reason_msgid), operand);
-  error (EXIT_TROUBLE, 0, _("Try '%s --help' for more information."),
-         program_name);
-}
-
 static void
 check_stdout (void)
 {
@@ -211,7 +204,7 @@ static char const *const option_help_msgid[] = {
 static void
 usage (void)
 {
-  printf (_("Usage: %s [OPTION]... FILE1 FILE2\n"), program_name);
+  printf (_("Usage: %s [OPTION]... FILE1 FILE2\n"), squote (0, program_name));
   printf ("%s\n\n",
           _("Side-by-side merge of differences between FILE1 and FILE2."));
 
@@ -279,13 +272,13 @@ check_child_status (int werrno, int wstatus, int max_ok_status,
     {
       error (0, werrno,
              _(status == 126
-               ? "subsidiary program '%s' could not be invoked"
+	       ? "subsidiary program %s could not be invoked"
                : status == 127
-               ? "subsidiary program '%s' not found"
+	       ? "subsidiary program %s not found"
                : status == INT_MAX
-               ? "subsidiary program '%s' failed"
-               : "subsidiary program '%s' failed (exit status %d)"),
-             subsidiary_program, status);
+	       ? "subsidiary program %s failed"
+	       : "subsidiary program %s failed (exit status %d)"),
+	     quote (subsidiary_program), status);
       exiterr ();
     }
 }
@@ -295,7 +288,7 @@ ck_fopen (char const *fname, char const *type)
 {
   FILE *r = fopen (fname, type);
   if (! r)
-    perror_fatal (fname);
+    perror_fatal (squote (0, fname));
   return r;
 }
 
@@ -565,9 +558,9 @@ main (int argc, char *argv[])
   if (argc - optind != 2)
     {
       if (argc - optind < 2)
-        try_help ("missing operand after '%s'", argv[argc - 1]);
+	try_help ("missing operand after %s", quote (argv[argc - 1]));
       else
-        try_help ("extra operand '%s'", argv[optind + 2]);
+	try_help ("extra operand %s", quote (argv[optind + 2]));
     }
 
   if (! output)
@@ -581,7 +574,7 @@ main (int argc, char *argv[])
       diffarg (argv[optind + 1]);
       diffarg (nullptr);
       execvp (diffargv[0], (char **) diffargv);
-      perror_fatal (diffargv[0]);
+      perror_fatal (squote (0, diffargv[0]));
     }
   else
     {
@@ -952,7 +945,7 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
             }
 
           if (! tmp)
-            perror_fatal (tmpname);
+	    perror_fatal (squote (0, tmpname));
 
           switch (cmd1)
             {

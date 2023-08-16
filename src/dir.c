@@ -19,11 +19,14 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "diff.h"
-#include <error.h>
+
+#include <diagnose.h>
 #include <dirname.h>
+#include <error.h>
 #include <exclude.h>
 #include <filenamecat.h>
-#include <mbcel.h>
+#include <mcel.h>
+#include <quote.h>
 #include <setjmp.h>
 #include <xalloc.h>
 
@@ -186,15 +189,15 @@ compare_collated (char const *name1, char const *name2)
 {
   int r;
   if (ignore_file_name_case)
-    r = mbcel_strcasecmp (name1, name2);  /* Best we can do.  */
+    r = mcel_casecmp (name1, name2);  /* Best we can do.  */
   else
     {
       errno = 0;
       r = strcoll (name1, name2);
       if (errno)
 	{
-	  error (0, errno, _("cannot compare file names '%s' and '%s'"),
-		 name1, name2);
+	  error (0, errno, _("cannot compare file names %s and %s"),
+		 quote_n (0, name1), quote_n (1, name2));
 	  longjmp (failed_locale_specific_sorting, 1);
 	}
     }
@@ -244,7 +247,7 @@ diff_dirs (struct comparison *cmp)
       && (cmp->file[1].desc == NONEXISTENT || dir_loop (cmp, 1)))
     {
       error (0, 0, _("%s: recursive directory loop"),
-             cmp->file[cmp->file[0].desc == NONEXISTENT].name);
+	     squote (0, cmp->file[cmp->file[0].desc == NONEXISTENT].name));
       return EXIT_TROUBLE;
     }
 
@@ -313,12 +316,12 @@ diff_dirs (struct comparison *cmp)
                 }
             }
 
-	  enum detype
-	    detype0 = HAVE_STRUCT_DIRENT_D_TYPE && *n0 ? (*n0)[-1] : DE_UNKNOWN,
-	    detype1 = HAVE_STRUCT_DIRENT_D_TYPE && *n1 ? (*n1)[-1] : DE_UNKNOWN;
-	  int v1 = compare_files (cmp,
-				  0 < nameorder ? nullptr : *n0++, detype0,
-				  nameorder < 0 ? nullptr : *n1++, detype1);
+	  enum detype detypes[]
+	    = { HAVE_STRUCT_DIRENT_D_TYPE && *n0 ? (*n0)[-1] : DE_UNKNOWN,
+		HAVE_STRUCT_DIRENT_D_TYPE && *n1 ? (*n1)[-1] : DE_UNKNOWN };
+	  int v1 = compare_files (cmp, detypes,
+				  0 < nameorder ? nullptr : *n0++,
+				  nameorder < 0 ? nullptr : *n1++);
           if (val < v1)
             val = v1;
         }
@@ -339,7 +342,7 @@ static bool ATTRIBUTE_PURE
 dir_loop (struct comparison const *cmp, int i)
 {
   for (struct comparison const *p = cmp; (p = p->parent) != &noparent; )
-    if (0 < same_file (&p->file[i].stat, &cmp->file[i].stat))
+    if (same_file (&p->file[i].stat, &cmp->file[i].stat))
       return true;
   return false;
 }

@@ -21,6 +21,7 @@
 #include "diff.h"
 
 #include <argmatch.h>
+#include <diagnose.h>
 #include <dirname.h>
 #include <error.h>
 #include <flexmember.h>
@@ -83,7 +84,7 @@ static struct msg **msg_chain_end = &msg_chain;
 void
 perror_with_name (char const *name)
 {
-  error (0, errno, "%s", name);
+  error (0, errno, "%s", squote (0, name));
 }
 
 /* Use when a system call returns non-zero status and that is fatal.  */
@@ -827,98 +828,18 @@ setup_output (char const *name0, char const *name1, bool recursive)
 static pid_t pr_pid;
 #endif
 
-static char c_escape_char (char c)
-{
-  switch (c) {
-    case '\a': return 'a';
-    case '\b': return 'b';
-    case '\t': return 't';
-    case '\n': return 'n';
-    case '\v': return 'v';
-    case '\f': return 'f';
-    case '\r': return 'r';
-    case '"': return '"';
-    case '\\': return '\\';
-    default:
-      return c < 32;
-  }
-}
-
-static char *
-c_escape (char const *str)
-{
-  char const *s;
-  idx_t plus = 0;
-  bool must_quote = false;
-
-  for (s = str; *s; s++)
-    {
-      char c = *s;
-
-      if (c == ' ')
-        {
-          must_quote = true;
-          continue;
-        }
-      switch (c_escape_char (*s))
-        {
-          case 1:
-            plus += 3;
-            /* fall through */
-          case 0:
-            break;
-          default:
-            plus++;
-            break;
-        }
-    }
-
-  if (must_quote || plus)
-    {
-      char *buffer = ximalloc (s - str + plus + 3);
-      char *b = buffer;
-
-      *b++ = '"';
-      for (s = str; *s; s++)
-        {
-          char c = *s;
-          char escape = c_escape_char (c);
-
-          switch (escape)
-            {
-              case 0:
-                *b++ = c;
-                break;
-              case 1:
-                *b++ = '\\';
-                *b++ = ((c >> 6) & 03) + '0';
-                *b++ = ((c >> 3) & 07) + '0';
-                *b++ = ((c >> 0) & 07) + '0';
-                break;
-              default:
-                *b++ = '\\';
-                *b++ = escape;
-                break;
-            }
-        }
-      *b++ = '"';
-      *b = 0;
-      return buffer;
-    }
-
-  return (char *) str;
-}
-
+
 void
 begin_output (void)
 {
   if (outfile)
     return;
 
-  char *names[2] = {c_escape (current_name0), c_escape (current_name1)};
+  char const *names[2] = {squote (0, current_name0),
+			  squote (1, current_name1)};
 
   /* Construct the header of this piece of diff.  */
-  /* POSIX 1003.1-2001 specifies this format.  But there are some bugs in
+  /* POSIX 1003.1-2017 specifies this format.  But there are some bugs in
      the standard: it says that we must print only the last component
      of the pathnames, and it requires two spaces after "diff" if
      there are no options.  These requirements are silly and do not
@@ -998,13 +919,8 @@ begin_output (void)
 
   /* A special header is needed at the beginning of context output.  */
   if (output_style == OUTPUT_CONTEXT || output_style == OUTPUT_UNIFIED)
-    print_context_header (curr.file, (char const *const *) names,
+    print_context_header (curr.file, names,
 			  output_style == OUTPUT_UNIFIED);
-
-  if (names[0] != current_name0)
-    free (names[0]);
-  if (names[1] != current_name1)
-    free (names[1]);
 }
 
 /* Call after the end of output of diffs for one file.
@@ -1035,13 +951,13 @@ finish_output (void)
       if (status)
         error (EXIT_TROUBLE, werrno,
                _(status == 126
-                 ? "subsidiary program '%s' could not be invoked"
+		 ? "subsidiary program %s could not be invoked"
                  : status == 127
-                 ? "subsidiary program '%s' not found"
+		 ? "subsidiary program %s not found"
                  : status == INT_MAX
-                 ? "subsidiary program '%s' failed"
-                 : "subsidiary program '%s' failed (exit status %d)"),
-               pr_program, status);
+		 ? "subsidiary program %s failed"
+		 : "subsidiary program %s failed (exit status %d)"),
+	       quote (pr_program), status);
     }
 
   outfile = nullptr;

@@ -19,7 +19,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "diff.h"
+
 #include <cmpbuf.h>
+#include <diagnose.h>
 #include <error.h>
 #include <file-type.h>
 #include <xalloc.h>
@@ -442,8 +444,8 @@ briefly_report (int changes, struct file_data const filevec[])
     message ((brief
               ? N_("Files %s and %s differ\n")
               : N_("Binary files %s and %s differ\n")),
-             file_label[0] ? file_label[0] : filevec[0].name,
-             file_label[1] ? file_label[1] : filevec[1].name);
+	     file_label[0] ? file_label[0] : squote (0, filevec[0].name),
+	     file_label[1] ? file_label[1] : squote (1, filevec[1].name));
 }
 
 /* Report the differences of two files.  */
@@ -680,7 +682,8 @@ diff_2_files (struct comparison *cmp)
           if (cmp->file[f].missing_newline)
             {
               error (0, 0, "%s: %s\n",
-                     file_label[f] ? file_label[f] : cmp->file[f].name,
+		     (file_label[f] ? file_label[f]
+		      : squote (0, cmp->file[f].name)),
                      _("No newline at end of file"));
               changes = 2;
             }

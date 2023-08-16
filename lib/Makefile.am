@@ -29,7 +29,7 @@ noinst_HEADERS =
 
 include gnulib.mk
 
-noinst_HEADERS += cmpbuf.h mbcel.h
-libdiffutils_a_SOURCES += cmpbuf.c mbcel.c mbcel-strcasecmp.c
+noinst_HEADERS += cmpbuf.h diagnose.h mcel.h ucore.h
+libdiffutils_a_SOURCES += cmpbuf.c diagnose.c mcel.c mcel-casecmp.c ucore.c
 
 AM_CFLAGS += $(GNULIB_WARN_CFLAGS) $(WERROR_CFLAGS)

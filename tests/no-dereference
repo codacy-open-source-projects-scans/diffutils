@@ -13,7 +13,7 @@ ln -s regular3 symlink3
 
 # Non-recursive comparisons.
 
-# Test case 3: Compare regular file with regular file.
+# Compare regular file with regular file.
 returns_ 1 diff --no-dereference regular1 regular2 > out || fail=1
 cat <<EOF > expected || framework_failure_
 1c1
@@ -23,43 +23,47 @@ cat <<EOF > expected || framework_failure_
 EOF
 compare expected out || fail=1
 
-# Test case 4: Compare regular file with symbolic link.
+# Compare regular file with symbolic link.
 returns_ 1 diff --no-dereference regular1 symlink1 > out || fail=1
 cat <<EOF > expected || framework_failure_
 File regular1 is a regular file while file symlink1 is a symbolic link
 EOF
 compare expected out || fail=1
 
-# Test case 5: Compare symbolic link with regular file.
+# Compare symbolic link with regular file.
 returns_ 1 diff --no-dereference symlink1 regular1 > out || fail=1
 cat <<EOF > expected || framework_failure_
 File symlink1 is a symbolic link while file regular1 is a regular file
 EOF
 compare expected out || fail=1
 
-# Test case 6: Compare symbolic links with same value.
+# Compare symbolic links with same value.
 diff --no-dereference symlink1 symlink1bis > out || fail=1
 compare /dev/null out || fail=1
 
-# Test case 7: Compare symbolic links with different value and different target
-# contents.
-returns_ 1 diff --no-dereference symlink1 symlink2 > out || fail=1
+# Compare symbolic links with different value and different target contents.
+LC_ALL=C returns_ 1 diff --no-dereference symlink1 symlink2 > out || fail=1
 cat <<EOF > expected || framework_failure_
-Symbolic links symlink1 and symlink2 differ
+Symbolic links 'symlink1' -> 'regular1' and 'symlink2' -> 'regular2' differ
 EOF
 compare expected out || fail=1
 
-# Test case 8: Compare symbolic links with different value and same target
-# contents.
-returns_ 1 diff --no-dereference symlink2 symlink3 > out || fail=1
+# Compare symbolic links with different value and same target contents.
+LC_ALL=C returns_ 1 diff --no-dereference symlink2 symlink3 > out || fail=1
 cat <<EOF > expected || framework_failure_
-Symbolic links symlink2 and symlink3 differ
+Symbolic links 'symlink2' -> 'regular2' and 'symlink3' -> 'regular3' differ
 EOF
 compare expected out || fail=1
+
+mkdir subdir &&
+ln -s loop loop &&
+ln -s loop subdir/loop || framework_failure_
+diff --no-dereference loop subdir > out || fail=1
+compare /dev/null out || fail=1
 
 # Recursive comparisons.
 
-# Test case 1: Compare symbolic link with nonexistent file.
+# Compare symbolic link with nonexistent file.
 mkdir subdir1a
 mkdir subdir1b
 ln -s nonexistent subdir1a/foo
@@ -71,7 +75,7 @@ Only in subdir1a: foo
 EOF
 compare expected out || fail=1
 
-# Test case 1: Compare nonexistent file with symbolic link.
+# Compare nonexistent file with symbolic link.
 mkdir subdir2a
 mkdir subdir2b
 ln -s nonexistent subdir2b/foo
@@ -83,7 +87,7 @@ Only in subdir2b: foo
 EOF
 compare expected out || fail=1
 
-# Test case 3: Compare regular file with regular file.
+# Compare regular file with regular file.
 mkdir subdir3a
 mkdir subdir3b
 cp regular1 subdir3a/foo
@@ -98,7 +102,7 @@ diff -r --no-dereference subdir3a/foo subdir3b/foo
 EOF
 compare expected out || fail=1
 
-# Test case 4: Compare regular file with symbolic link.
+# Compare regular file with symbolic link.
 mkdir subdir4a
 mkdir subdir4b
 cp regular1 subdir4a/foo
@@ -109,7 +113,7 @@ File subdir4a/foo is a regular file while file subdir4b/foo is a symbolic link
 EOF
 compare expected out || fail=1
 
-# Test case 5: Compare symbolic link with regular file.
+# Compare symbolic link with regular file.
 mkdir subdir5a
 mkdir subdir5b
 ln -s ../regular1 subdir5a/foo
@@ -120,7 +124,7 @@ File subdir5a/foo is a symbolic link while file subdir5b/foo is a regular file
 EOF
 compare expected out || fail=1
 
-# Test case 6: Compare symbolic links with same value.
+# Compare symbolic links with same value.
 mkdir subdir6a
 mkdir subdir6b
 ln -s ../regular1 subdir6a/foo
@@ -128,27 +132,25 @@ ln -s ../regular1 subdir6b/foo
 diff -r --no-dereference subdir6a subdir6b > out || fail=1
 compare /dev/null out || fail=1
 
-# Test case 7: Compare symbolic links with different value and different target
-# contents.
+# Compare symbolic links with different value and different target contents.
 mkdir subdir7a
 mkdir subdir7b
 ln -s ../regular1 subdir7a/foo
 ln -s ../regular2 subdir7b/foo
-returns_ 1 diff -r --no-dereference subdir7a subdir7b > out || fail=1
+LC_ALL=C returns_ 1 diff -r --no-dereference subdir7a subdir7b > out || fail=1
 cat <<EOF > expected || framework_failure_
-Symbolic links subdir7a/foo and subdir7b/foo differ
+Symbolic links 'subdir7a/foo' -> '../regular1' and 'subdir7b/foo' -> '../regular2' differ
 EOF
 compare expected out || fail=1
 
-# Test case 8: Compare symbolic links with different value and same target
-# contents.
+# Compare symbolic links with different value and same target contents.
 mkdir subdir8a
 mkdir subdir8b
 ln -s ../regular2 subdir8a/foo
 ln -s ../regular3 subdir8b/foo
-returns_ 1 diff -r --no-dereference subdir8a subdir8b > out || fail=1
+LC_ALL=C returns_ 1 diff -r --no-dereference subdir8a subdir8b > out || fail=1
 cat <<EOF > expected || framework_failure_
-Symbolic links subdir8a/foo and subdir8b/foo differ
+Symbolic links 'subdir8a/foo' -> '../regular2' and 'subdir8b/foo' -> '../regular3' differ
 EOF
 compare expected out || fail=1
 

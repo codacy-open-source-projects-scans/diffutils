@@ -17,9 +17,10 @@
 
 lib/argmatch.c
 lib/argmatch.h
+lib/c-file-type.c
 lib/c-stack.c
+lib/diagnose.c
 lib/error.c
-lib/file-type.c
 lib/getopt.c
 lib/openat-die.c
 lib/quotearg.c

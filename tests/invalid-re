@@ -7,7 +7,7 @@ fail=0
 
 echo > a || framework_failure_
 echo b > b || framework_failure_
-echo 'diff: \: Trailing backslash' > exp-err || framework_failure_
+echo "diff: '\': Trailing backslash" > exp-err || framework_failure_
 
 # This must fail with an exit status of 2:
 returns_ 2 diff -Ix -I\\ a b > out 2> err || fail=1
