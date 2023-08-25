@@ -187,19 +187,13 @@ dir_read (int parentdirfd, struct file_data *dir, struct dirdata *dirdata,
 static int
 compare_collated (char const *name1, char const *name2)
 {
-  int r;
-  if (ignore_file_name_case)
-    r = mcel_casecmp (name1, name2);  /* Best we can do.  */
-  else
+  errno = 0;
+  int r = strcoll (name1, name2);
+  if (errno)
     {
-      errno = 0;
-      r = strcoll (name1, name2);
-      if (errno)
-	{
-	  error (0, errno, _("cannot compare file names %s and %s"),
-		 quote_n (0, name1), quote_n (1, name2));
-	  longjmp (failed_locale_specific_sorting, 1);
-	}
+      error (0, errno, _("cannot compare file names %s and %s"),
+	     quote_n (0, name1), quote_n (1, name2));
+      longjmp (failed_locale_specific_sorting, 1);
     }
   return r;
 }
@@ -209,10 +203,13 @@ compare_collated (char const *name1, char const *name2)
 static int
 compare_names (char const *name1, char const *name2)
 {
+  if (ignore_file_name_case)
+    return mbscasecmp (name1, name2);  /* Best we can do.  */
+
   if (locale_specific_sorting)
     {
       int diff = compare_collated (name1, name2);
-      if (diff || ignore_file_name_case)
+      if (diff)
         return diff;
     }
   return file_name_cmp (name1, name2);

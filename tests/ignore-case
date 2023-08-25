@@ -19,4 +19,8 @@ echo 'aāȁάαаӑḁἀⓐꞻａ𐐨-δ' >b
 diff -i a b >out || fail=1
 compare /dev/null out || fail=1
 
+mkdir d || framework_failure_
+touch f d/F || framework_failure_
+diff --ignore-file-name-case f d || fail=1
+
 Exit $fail

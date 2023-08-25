@@ -3,7 +3,7 @@
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
-   published by the Free Software Foundation; either version 3 of the
+   published by the Free Software Foundation; either version 2.1 of the
    License, or (at your option) any later version.
 
    This file is distributed in the hope that it will be useful,
@@ -16,7 +16,14 @@
 
 /* Written by Paul Eggert.  */
 
-/* The mcel_scan function lets code iterate through an array of bytes,
+/* The macros in this file implement multi-byte character representation
+   and forward iteration through a multi-byte string.
+   They are simpler and typically faster than the mbiter family.
+   However, they do not support obsolescent encodings like CP864,
+   EBCDIC, Johab, and Shift JIS that glibc also does not support,
+   and it is up to the caller to coalesce encoding-error bytes if desired.
+
+   The mcel_scan function lets code iterate through an array of bytes,
    supporting character encodings in practical use
    more simply than using plain mbrtoc32.
 
@@ -35,8 +42,11 @@
 	  process (g);
 	}
 
+   You can select from G using G.ch, G.err, and G.len.
+   G is an encoding error if G.err is nonzero, a character otherwise.
+
    The mcel_scanz function is similar except it works with a
-   string of unknown length that is terminated with '\0'.
+   string of unknown but positive length that is terminated with '\0'.
    Instead of this single-byte code:
 
       char *p = ...;
@@ -57,12 +67,16 @@
    '\n', '.', '/' are safe, as they cannot be a part (even a trailing
    byte) of a multi-byte character.
 
-   You can select from G using G.c and G.len.
-   You can use ucore_* functions on G.c, e.g., ucore_iserr (G.c),
-   ucore_is (c32isalpha, G.c), and ucore_to (c32tolower, G.c).
+   mcel_ch (CH, LEN) and mcel_err (ERR) construct mcel_t values.
 
-   mcel_strcasecmp compares two null-terminated multi-byte strings
-   lexicographically, ignoring case.
+   mcel_cmp (G1, G2) compares two mcel_t values lexicographically by
+   character or by encoding byte value, with encoding bytes sorting
+   after characters.
+
+   Calls like c32isalpha (G.ch) test G; they return false for encoding
+   errors since calls like c32isalpha (0) return false.  Calls like
+   mcel_tocmp (c32tolower, G1, G2) are like mcel_cmp (G1, G2),
+   but transliterate first.
 
    Although ISO C and POSIX allow encodings that have shift states or
    that can produce multiple characters from an indivisible byte sequence,
@@ -73,9 +87,20 @@
 #ifndef _MCEL_H
 #define _MCEL_H 1
 
-/* This API is an extension of ucore.h.  Programs that include this
-   file can assume ucore.h is included too.  */
-#include <ucore.h>
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
+
+#include <verify.h>
+
+#include <limits.h>
+#include <stddef.h>
+#include <uchar.h>
+
+/* Pacify GCC re type limits.  */
+#if defined __GNUC__ && 4 < __GNUC__ + (3 <= __GNUC_MINOR__)
+# pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
 
 /* The maximum multi-byte character length supported on any platform.
    This can be less than MB_LEN_MAX because many platforms have a
@@ -85,24 +110,41 @@
    0 < MB_CUR_MAX <= MCEL_LEN_MAX <= MB_LEN_MAX.  */
 enum { MCEL_LEN_MAX = MB_LEN_MAX < 4 ? MB_LEN_MAX : 4 };
 
-/* mcel_t is a type representing a character or encoding error C,
-   along with a count of the LEN bytes that represent C.
-   1 <= LEN <= MB_LEN_MAX.  */
+/* Bounds for mcel_t members.  */
+enum { MCEL_CHAR_MAX = 0x10FFFF };
+enum { MCEL_ERR_MIN = 0x80 };
+enum { MCEL_ERR_MAX = UCHAR_MAX };
+
+/* mcel_t is a type representing a character CH or an encoding error byte ERR,
+   along with a count of the LEN bytes that represent CH or ERR.
+   If ERR is zero, CH is a valid character and 0 < LEN <= MCEL_LEN_MAX;
+   otherwise ERR is an encoding error byte, MCEL_ERR_MIN <= ERR <= MCEL_ERR_MAX.
+   CH == 0, and LEN == 1.  */
 typedef struct
 {
-  ucore_t c;
+  char32_t ch;
+  unsigned char err;
   unsigned char len;
 } mcel_t;
 
 /* Every multi-byte character length fits in mcel_t's LEN.  */
 static_assert (MB_LEN_MAX <= UCHAR_MAX);
 
+/* Shifting an encoding error byte left by this value
+   suffices to sort encoding errors after characters.  */
+enum { MCEL_ERR_SHIFT = 14 };
+static_assert (MCEL_CHAR_MAX < MCEL_ERR_MIN << MCEL_ERR_SHIFT);
+
+/* Unsigned char promotes to int.  */
+static_assert (UCHAR_MAX <= INT_MAX);
+
 /* Bytes have 8 bits, as POSIX requires.  */
 static_assert (CHAR_BIT == 8);
 
-/* Pacify GCC re 'c <= 0x7f' below.  */
-#if defined __GNUC__ && 4 < __GNUC__ + (3 <= __GNUC_MINOR__)
-# pragma GCC diagnostic ignored "-Wtype-limits"
+#ifndef _GL_LIKELY
+/* Rely on __builtin_expect, as provided by the module 'builtin-expect'.  */
+# define _GL_LIKELY(cond) __builtin_expect ((cond), 1)
+# define _GL_UNLIKELY(cond) __builtin_expect ((cond), 0)
 #endif
 
 _GL_INLINE_HEADER_BEGIN
@@ -110,18 +152,44 @@ _GL_INLINE_HEADER_BEGIN
 # define MCEL_INLINE _GL_INLINE
 #endif
 
-/* With mcel there should be no need for the performance overhead of
-   replacing glibc mbrtoc32, as callers shouldn't care whether the
-   C locale treats a byte with the high bit set as an encoding error.  */
-#ifdef __GLIBC__
-# undef mbrtoc32
-#endif
+/* mcel_t constructors.  */
+MCEL_INLINE mcel_t
+mcel_ch (char32_t ch, size_t len)
+{
+  assume (0 < len);
+  assume (len <= MCEL_LEN_MAX);
+  assume (ch <= MCEL_CHAR_MAX);
+  return (mcel_t) {.ch = ch, .len = len};
+}
+MCEL_INLINE mcel_t
+mcel_err (unsigned char err)
+{
+  assume (MCEL_ERR_MIN <= err);
+  assume (err <= MCEL_ERR_MAX);
+  return (mcel_t) {.err = err, .len = 1};
+}
 
-/* Shifting an encoding error byte (at least 0x80) left by this value
-   yields a value in the range UCORE_ERR_MIN .. 2*UCORE_ERR_MIN - 1.
-   This suffices to sort encoding errors after characters.  */
-enum { MCEL_ENCODING_ERROR_SHIFT = 14 };
-static_assert (UCORE_ERR_MIN == 0x80 << MCEL_ENCODING_ERROR_SHIFT);
+/* Compare C1 and C2, with encoding errors sorting after characters.
+   Return <0, 0, >0 for <, =, >.  */
+MCEL_INLINE int
+mcel_cmp (mcel_t c1, mcel_t c2)
+{
+  int ch1 = c1.ch, ch2 = c2.ch;
+  return ((c1.err - c2.err) * (1 << MCEL_ERR_SHIFT)) + (ch1 - ch2);
+}
+
+/* Apply the uchar translator TO to C1 and C2 and compare the results,
+   with encoding errors sorting after characters,
+   Return <0, 0, >0 for <, =, >.  */
+MCEL_INLINE int
+mcel_tocmp (wint_t (*to) (wint_t), mcel_t c1, mcel_t c2)
+{
+  int cmp = mcel_cmp (c1, c2);
+  if (_GL_LIKELY ((c1.err - c2.err) | !cmp))
+    return cmp;
+  int ch1 = to (c1.ch), ch2 = to (c2.ch);
+  return ch1 - ch2;
+}
 
 /* Whether C represents itself as a Unicode character
    when it is the first byte of a single- or multi-byte character.
@@ -130,8 +198,15 @@ static_assert (UCORE_ERR_MIN == 0x80 << MCEL_ENCODING_ERROR_SHIFT);
 MCEL_INLINE bool
 mcel_isbasic (char c)
 {
-  return 0 <= c && c <= 0x7f;
+  return _GL_LIKELY (0 <= c && c <= 0x7f);
 }
+
+/* With mcel there should be no need for the performance overhead of
+   replacing glibc mbrtoc32, as callers shouldn't care whether the
+   C locale treats a byte with the high bit set as an encoding error.  */
+#ifdef __GLIBC__
+# undef mbrtoc32
+#endif
 
 /* Scan bytes from P inclusive to LIM exclusive.  P must be less than LIM.
    Return the character or encoding error starting at P.  */
@@ -141,8 +216,8 @@ mcel_scan (char const *p, char const *lim)
   /* Handle ASCII quickly to avoid the overhead of calling mbrtoc32.
      In supported encodings, the first byte of a multi-byte character
      cannot be an ASCII byte.  */
-  if (_GL_LIKELY (mcel_isbasic (*p)))
-    return (mcel_t) { .c = *p, .len = 1 };
+  if (mcel_isbasic (*p))
+    return mcel_ch (*p, 1);
 
   /* An initial mbstate_t; initialization optimized for some platforms.
      For details about these and other platforms, see wchar.in.h.  */
@@ -171,29 +246,17 @@ mcel_scan (char const *p, char const *lim)
   mbstate_t mbs = {0};
 #endif
 
-  char32_t c;
-  size_t len = mbrtoc32 (&c, p, lim - p, &mbs);
+  char32_t ch;
+  size_t len = mbrtoc32 (&ch, p, lim - p, &mbs);
 
   /* Any LEN with top bit set is an encoding error, as LEN == (size_t) -3
      is not supported and MB_LEN_MAX is small.  */
-  if (_GL_LIKELY (len <= (size_t) -1 / 2))
-    {
-      /* A multi-byte character.  LEN must be positive,
-	 as *P != '\0' and shift sequences are not supported.  */
-      assume (0 < len);
-      assume (len <= MB_LEN_MAX);
-      assume (c <= UCORE_CHAR_MAX);
-      return (mcel_t) { .c = c, .len = len };
-    }
-  else
-    {
-      /* An encoding error.  */
-      unsigned char b = *p;
-      c = b << MCEL_ENCODING_ERROR_SHIFT;
-      assume (UCORE_ERR_MIN <= c);
-      assume (c <= UCORE_ERR_MAX);
-      return (mcel_t) { .c = c, .len = 1 };
-    }
+  if (_GL_UNLIKELY ((size_t) -1 / 2 < len))
+    return mcel_err (*p);
+
+  /* A multi-byte character.  LEN must be positive,
+     as *P != '\0' and shift sequences are not supported.  */
+  return mcel_ch (ch, len);
 }
 
 /* Scan bytes from P, a byte sequence terminated by TERMINATOR.
@@ -205,11 +268,11 @@ MCEL_INLINE mcel_t
 mcel_scant (char const *p, char terminator)
 {
   /* Handle ASCII quickly for speed.  */
-  if (_GL_LIKELY (mcel_isbasic (*p)))
-    return (mcel_t) { .c = *p, .len = 1 };
+  if (mcel_isbasic (*p))
+    return mcel_ch (*p, 1);
 
   /* Defer to mcel_scan for non-ASCII.  Compute length with code that
-     is typically branch-free and faster than memchr or strnlen.  */
+     is typically faster than strnlen.  */
   char const *lim = p + 1;
   for (int i = 0; i < MCEL_LEN_MAX - 1; i++)
     lim += *lim != terminator;
@@ -225,11 +288,6 @@ mcel_scanz (char const *p)
 {
   return mcel_scant (p, '\0');
 }
-
-/* Compare the multi-byte strings S1 and S2 lexicographically, ignoring case.
-   Return <0, 0, >0 for <, =, >.  Consider encoding errors to be
-   greater than characters and compare them byte by byte.  */
-int mcel_casecmp (char const *s1, char const *s2);
 
 _GL_INLINE_HEADER_END
 

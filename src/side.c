@@ -146,7 +146,7 @@ print_half_line (char const *const *line, intmax_t indent, intmax_t out_bound)
 	       Increase TEXT_POINTER, counting columns.
 	       Assume encoding errors have print width 1.  */
 	    mcel_t g = mcel_scan (tp0, text_limit);
-	    int width = ucore_iserr (g.c) ? 1 : c32width (g.c);
+	    int width = g.err ? 1 : c32width (g.ch);
 	    if (0 < width && ckd_add (&in_position, in_position, width))
 	      return out_position;
 

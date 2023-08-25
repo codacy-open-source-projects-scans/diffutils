@@ -1544,19 +1544,18 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 	  if (cmp.file[fnm_arg].desc == STDIN_FILENO)
 	    fatal ("cannot compare '-' to a directory");
 	  char const *fnm = cmp.file[fnm_arg].name;
-	  char const *base_fnm = last_component (fnm);
 	  char const *filename = cmp.file[dir_arg].name = free0
-	    = find_dir_file_pathname (&cmp.file[dir_arg], base_fnm);
-	  int dirdesc = cmp.file[dir_arg].desc;
+	    = find_dir_file_pathname (&cmp.file[dir_arg], last_component (fnm));
+	  int dirfd = cmp.file[dir_arg].desc;
+	  if (dirfd < 0)
+	    dirfd = AT_FDCWD;
+	  char const *atname = dirfd < 0 ? filename : last_component (filename);
 	  cmp.file[dir_arg].desc = UNOPENED;
-	  noparent.file[dir_arg].desc = dirdesc < 0 ? AT_FDCWD : dirdesc;
-	  cmp.file[dir_arg].desc = openat (noparent.file[dir_arg].desc,
-					   dirdesc < 0 ? filename : base_fnm,
-					   O_RDONLY | oflags);
+	  noparent.file[dir_arg].desc = dirfd;
+	  cmp.file[dir_arg].desc = openat (dirfd, atname, O_RDONLY | oflags);
 	  if (O_PATH_DEFINED && cmp.file[dir_arg].desc < 0
 	      && no_dereference_symlinks && errno == ELOOP)
-	    cmp.file[dir_arg].desc = openat (noparent.file[dir_arg].desc,
-					     dirdesc < 0 ? filename : base_fnm,
+	    cmp.file[dir_arg].desc = openat (dirfd, atname,
 					     O_PATHSEARCH | oflags);
 	  if (cmp.file[dir_arg].desc < 0
 	      || fstat (cmp.file[dir_arg].desc, &cmp.file[dir_arg].stat) < 0)

@@ -73,8 +73,11 @@ config-save:
 	ln -nsf $(_date_time) $(_cf_state_dir)/latest
 	cp lib/config.h config.status $(_cf_state_dir)/latest
 
-exclude_file_name_regexp--sc_space_tab = ^gl/lib/.*\.c\.diff$$
-exclude_file_name_regexp--sc_prohibit_doubled_word = ^tests/y2038-vs-32bit$$
+exclude_file_name_regexp--sc_GPL_version = ^gl/lib/
+exclude_file_name_regexp--sc_bindtextdomain = ^gl/tests/
+exclude_file_name_regexp--sc_doubled_words = ^gl/lib/mcel\.h$$
+exclude_file_name_regexp--sc_prohibit_doubled_word = ^(gl/lib/mcel\.h|tests/y2038-vs-32bit)$$
+exclude_file_name_regexp--sc_prohibit_strcmp = ^gl/lib/
 
 # Tell gnulib's tight_scope rule that we mark externs with XTERN
 export _gl_TS_extern = extern|XTERN|DIFF_INLINE|SYSTEM_INLINE|SYSTEM_EXTERN

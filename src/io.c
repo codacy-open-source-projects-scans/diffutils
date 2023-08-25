@@ -230,6 +230,14 @@ slurp (struct file_data *current)
     }
 }
 
+/* Return true if CH1 and ERR1 stand for the same character or
+   encoding error as CH2 and ERR2.  */
+static bool
+same_ch_err (char32_t ch1, unsigned char err1, char32_t ch2, unsigned char err2)
+{
+  return ! ((ch1 ^ ch2) | (err1 ^ err2));
+}
+
 /* Compare lines S1 of length S1LEN and S2 of length S2LEN (typically
    one line from each input file) according to the command line options.
    Line lengths include the trailing newline.
@@ -427,7 +435,7 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
     {
       char const *lim1 = s1 + s1len;
       char const *lim2 = s2 + s2len;
-      ucore_t c1prev = 0;
+      char32_t ch1prev = 0;
 
       while (true)
 	{
@@ -435,27 +443,27 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 	  mcel_t g2 = mcel_scan (t2, lim2);
 	  t1 += g1.len;
 	  t2 += g2.len;
-	  ucore_t c1 = g1.c;
-	  ucore_t c2 = g2.c;
+	  char32_t ch1 = g1.ch;
+	  char32_t ch2 = g2.ch;
 
 	  /* Test for exact equality first, since it's a common case.  */
-	  if (ucore_cmp (c1, c2) != 0)
+	  if (! same_ch_err (ch1, g1.err, ch2, g2.err))
 	    {
 	      switch (ignore_white_space)
 		{
 		case IGNORE_ALL_SPACE:
 		  /* For -w, just skip past any white space.  */
-		  while (c1 != '\n' && ! ucore_is (c32isspace, c1))
+		  while (ch1 != '\n' && c32isspace (ch1))
 		    {
 		      g1 = mcel_scan (t1, lim1);
 		      t1 += g1.len;
-		      c1 = g1.c;
+		      ch1 = g1.ch;
 		    }
-		  while (c2 != '\n' && ucore_is (c32isspace, c2))
+		  while (ch2 != '\n' && c32isspace (ch2))
 		    {
 		      g2 = mcel_scan (t2, lim2);
 		      t2 += g2.len;
-		      c2 = g2.c;
+		      ch2 = g2.ch;
 		    }
 		  break;
 
@@ -463,48 +471,46 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 		  /* For -b, advance past any sequence of white space in
 		     line 1 and consider it just one space, or nothing at
 		     all if it is at the end of the line.  */
-		  if (ucore_is (c32isspace, c1))
-		    while (c1 != '\n')
+		  if (c32isspace (ch1))
+		    while (ch1 != '\n')
 		      {
 			g1 = mcel_scan (t1, lim1);
 			t1 += g1.len;
-			c1 = g1.c;
-			if (! ucore_is (c32isspace, c1))
+			ch1 = g1.ch;
+			if (! c32isspace (ch1))
 			  {
 			    t1 -= g1.len;
-			    c1 = ' ';
+			    ch1 = ' ';
 			    break;
 			  }
 		      }
 
 		  /* Likewise for line 2.  */
-		  if (ucore_is (c32isspace, c2))
-		    while (c2 != '\n')
+		  if (c32isspace (ch2))
+		    while (ch2 != '\n')
 		      {
 			g2 = mcel_scan (t2, lim2);
 			t2 += g2.len;
-			c2 = g2.c;
-			if (! ucore_is (c32isspace, c2))
+			ch2 = g2.ch;
+			if (! c32isspace (ch2))
 			  {
 			    t2 -= g2.len;
-			    c2 = ' ';
+			    ch2 = ' ';
 			    break;
 			  }
 		      }
 
-		  if (c1 != c2)
+		  if (ch1 != ch2)
 		    {
 		      /* If we went too far when doing the simple test
 			 for equality, go back to the first non-white-space
 			 character in both sides and try again.  */
-		      if (c2 == ' ' && c1 != '\n'
-			  && ucore_is (c32isspace, c1prev))
+		      if (ch2 == ' ' && ch1 != '\n' && c32isspace (ch1prev))
 			{
 			  t1 -= g1.len;
 			  continue;
 			}
-		      if (c1 == ' ' && c2 != '\n'
-			  && ucore_is (c32isspace, c1prev))
+		      if (ch1 == ' ' && ch2 != '\n' && c32isspace (ch1prev))
 			{
 			  t2 -= g2.len;
 			  continue;
@@ -515,28 +521,28 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 
 		case IGNORE_TRAILING_SPACE:
 		case IGNORE_TAB_EXPANSION_AND_TRAILING_SPACE:
-		  if (ucore_is (c32isspace, c1) && ucore_is (c32isspace, c2))
+		  if (c32isspace (ch1) && c32isspace (ch2))
 		    {
-		      if (c1 != '\n')
+		      if (ch1 != '\n')
 			{
 			  char const *p = t1;
 			  while (*p != '\n')
 			    {
 			      mcel_t g = mcel_scan (p, lim1);
-			      if (! ucore_is (c32isspace, g.c))
+			      if (c32isspace (g.ch))
 				break;
 			      p += g.len;
 			    }
 			  if (*p != '\n')
 			    break;
 			}
-		      if (c2 != '\n')
+		      if (ch2 != '\n')
 			{
 			  char const *p = t2;
 			  while (*p != '\n')
 			    {
 			      mcel_t g = mcel_scan (p, lim2);
-			      if (! ucore_is (c32isspace, g.c))
+			      if (! c32isspace (g.ch))
 				break;
 			      p += g.len;
 			    }
@@ -550,45 +556,45 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 		    break;
 		  FALLTHROUGH;
 		case IGNORE_TAB_EXPANSION:
-		  if ((c1 == ' ' && c2 == '\t')
-		      || (c1 == '\t' && c2 == ' '))
+		  if ((ch1 == ' ' && ch2 == '\t')
+		      || (ch1 == '\t' && ch2 == ' '))
 		    {
 		      intmax_t tab2 = tab, column2 = column;
 
 		      while (true)
 			{
-			  if (c1 == '\t'
-			      || (c1 == ' ' && column == tabsize - 1))
+			  if (ch1 == '\t'
+			      || (ch1 == ' ' && column == tabsize - 1))
 			    {
 			      tab++;
 			      column = 0;
 			    }
-			  else if (c1 == ' ')
+			  else if (ch1 == ' ')
 			    column++;
 			  else
 			    break;
 
 			  g1 = mcel_scan (t1, lim1);
 			  t1 += g1.len;
-			  c1 = g1.c;
+			  ch1 = g1.ch;
 			}
 
 		      while (true)
 			{
-			  if (c2 == '\t'
-			      || (c2 == ' ' && column2 == tabsize - 1))
+			  if (ch2 == '\t'
+			      || (ch2 == ' ' && column2 == tabsize - 1))
 			    {
 			      tab2++;
 			      column2 = 0;
 			    }
-			  else if (c2 == ' ')
+			  else if (ch2 == ' ')
 			    column2++;
 			  else
 			    break;
 
 			  g2 = mcel_scan (t2, lim2);
 			  t2 += g2.len;
-			  c2 = g2.c;
+			  ch2 = g2.ch;
 			}
 
 		      if (tab != tab2 || column != column2)
@@ -602,15 +608,15 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 
 	      if (ignore_case)
 		{
-		  c1 = ucore_to (c32tolower, c1);
-		  c2 = ucore_to (c32tolower, c2);
+		  ch1 = c32tolower (ch1);
+		  ch2 = c32tolower (ch2);
 		}
 
-	      if (ucore_cmp (c1, c2) != 0)
+	      if (! same_ch_err (ch1, g1.err, ch2, g2.err))
 		break;
 	    }
 
-	  switch (c1)
+	  switch (ch1)
 	    {
 	    case '\n':
 	      return false;
@@ -634,7 +640,7 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 
 	    default:
 	      /* Assume that downcasing does not change print width.  */
-	      column += ucore_iserr (c1) ? 1 : c32width (c1);
+	      column += g1.err ? 1 : c32width (ch1);
 	      if (column < tabsize)
 		break;
 	      FALLTHROUGH;
@@ -644,7 +650,7 @@ lines_differ (char const *s1, idx_t s1len, char const *s2, idx_t s2len)
 	      break;
 	    }
 
-	  c1prev = c1;
+	  ch1prev = ch1;
 	}
     }
 
@@ -698,8 +704,8 @@ find_and_hash_each_line (struct file_data *current)
 	    for (mcel_t g; *p != '\n'; p += g.len)
 	      {
 		g = mcel_scan (p, suffix_begin);
-		if (! ucore_is (c32isspace, g.c))
-		  h = hash (h, (ig_case ? ucore_to (c32tolower, g.c) : g.c));
+		if (! c32isspace (g.ch))
+		  h = hash (h, (ig_case ? c32tolower (g.ch) : g.ch) - g.err);
 	      }
           break;
 
@@ -727,7 +733,7 @@ find_and_hash_each_line (struct file_data *current)
 	    for (mcel_t g; *p != '\n'; p += g.len)
 	      {
 		g = mcel_scan (p, suffix_begin);
-		if (ucore_is (c32isspace, g.c))
+		if (c32isspace (g.ch))
 		  {
 		    do
 		      {
@@ -736,13 +742,13 @@ find_and_hash_each_line (struct file_data *current)
 			  goto hashing_done;
 			g = mcel_scan (p, suffix_begin);
 		      }
-		    while (ucore_is (c32isspace, g.c));
+		    while (c32isspace (g.ch));
 
 		    h = hash (h, ' ');
 		  }
 
 		/* G is now the first non-space.  */
-		h = hash (h, ig_case ? ucore_to (c32tolower, g.c) : g.c);
+		h = hash (h, (ig_case ? c32tolower (g.ch) : g.ch) - g.err);
 	      }
           break;
 
@@ -818,13 +824,17 @@ find_and_hash_each_line (struct file_data *current)
 		  intmax_t repetitions = 1;
 
 		  g = mcel_scan (p, suffix_begin);
-		  ucore_t c = g.c;
-		  if (ucore_iserr (c))
-		    column++;
+		  char32_t ch;
+		  if (g.err)
+		    {
+		      ch = -g.err;
+		      column++;
+		    }
 		  else
 		    {
+		      ch = g.ch;
 		      if (ig_white_space & IGNORE_TRAILING_SPACE
-			  && ucore_is (c32isspace, c))
+			  && c32isspace (ch))
 			{
 			  char const *p1 = p + g.len;
 			  for (mcel_t g1; ; p1 += g1.len)
@@ -835,13 +845,13 @@ find_and_hash_each_line (struct file_data *current)
 				  goto hashing_done;
 				}
 			      g1 = mcel_scan (p1, suffix_begin);
-			      if (! ucore_is (c32isspace, g1.c))
+			      if (! c32isspace (g1.ch))
 				break;
 			    }
 			}
 
 		      if (ig_white_space & IGNORE_TAB_EXPANSION)
-			switch (c)
+			switch (ch)
 			  {
 			  case '\b':
 			    if (0 < column)
@@ -854,7 +864,7 @@ find_and_hash_each_line (struct file_data *current)
 			    break;
 
 			  case '\t':
-			    c = ' ';
+			    ch = ' ';
 			    repetitions = tabsize - column % tabsize;
 			    tab += column / tabsize + 1;
 			    column = 0;
@@ -868,16 +878,16 @@ find_and_hash_each_line (struct file_data *current)
 			    break;
 
 			  default:
-			    column += c32width (c);
+			    column += c32width (ch);
 			    break;
 			  }
 
 		      if (ig_case)
-			c = c32tolower (c);
+			ch = c32tolower (ch);
 		    }
 
 		  do
-		    h = hash (h, c);
+		    h = hash (h, ch);
 		  while (--repetitions != 0);
 		}
           }
@@ -899,13 +909,13 @@ find_and_hash_each_line (struct file_data *current)
 		for (mcel_t g; *p != '\n'; p += g.len)
 		  {
 		    g = mcel_scan (p, suffix_begin);
-		    h = hash (h, ucore_to (c32tolower, g.c));
+		    h = hash (h, c32tolower (g.ch) - g.err);
 		  }
 	      else
 		for (mcel_t g; *p != '\n'; p += g.len)
 		  {
 		    g = mcel_scan (p, suffix_begin);
-		    h = hash (h, g.c);
+		    h = hash (h, g.ch - g.err);
 		  }
 	    }
           break;
