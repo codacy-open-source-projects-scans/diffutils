@@ -56,6 +56,10 @@ AC_DEFINE([GNULIB_REGEX_SINGLE_THREAD], [1],
 AC_DEFINE([GNULIB_WCHAR_SINGLE_LOCALE], [1],
   [Locale-sensitive functions are called only after locale is set.])
 
+AC_DEFINE([GNULIB_MBRTOC32_REGULAR], [1],
+  [Do not worry about rare encodings like CP864, EBCDIC, Johab, and Shift JIS
+   that glibc does not support.])
+
 # gl_GCC_VERSION_IFELSE([major], [minor], [run-if-found], [run-if-not-found])
 # ------------------------------------------------
 # If $CPP is gcc-MAJOR.MINOR or newer, then run RUN-IF-FOUND.
