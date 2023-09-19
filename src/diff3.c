@@ -28,6 +28,7 @@
 #include "system.h"
 #include "paths.h"
 
+#include <c-ctype.h>
 #include <c-stack.h>
 #include <cmpbuf.h>
 #include <diagnose.h>

@@ -347,7 +347,8 @@ dir_loop (struct comparison const *cmp, int i)
 /* Find a matching filename in a directory.  */
 
 char *
-find_dir_file_pathname (struct file_data *dir, char const *file)
+find_dir_file_pathname (struct file_data *dir, char const *file,
+			enum detype *detype)
 {
   char const *match = file;
 
@@ -367,6 +368,7 @@ find_dir_file_pathname (struct file_data *dir, char const *file)
 	  match = *p;
       }
 
+  *detype = HAVE_STRUCT_DIRENT_D_TYPE && match != file ? match[-1] : DE_UNKNOWN;
   char *val = file_name_concat (dir->name, match, nullptr);
   free (dirdata.names);
   free (dirdata.data);

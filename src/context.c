@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "diff.h"
+#include <c-ctype.h>
 #include <stat-time.h>
 #include <strftime.h>
 
@@ -185,7 +186,7 @@ pr_context_hunk (struct change *hunk)
 
   /* Include a context's width before and after.  */
 
-  lin minus_prefix_lines = curr.file[0].prefix_lines;
+  lin minus_prefix_lines = - curr.file[0].prefix_lines;
   first0 = MAX (first0 - context, minus_prefix_lines);
   first1 = MAX (first1 - context, minus_prefix_lines);
   if (last0 < curr.file[0].valid_lines - context)

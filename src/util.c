@@ -25,6 +25,7 @@
 #include <dirname.h>
 #include <error.h>
 #include <flexmember.h>
+#include <mcel.h>
 #include <system-quote.h>
 #include <xalloc.h>
 
@@ -966,7 +967,7 @@ finish_output (void)
 /* Find the consecutive changes at the start of the script START.
    Return the last link before the first gap.  */
 
-struct change * ATTRIBUTE_CONST
+struct change *
 find_change (struct change *script)
 {
   return script;
@@ -1085,11 +1086,11 @@ output_1_line (char const *base, char const *limit, char const *flag_format,
         {
           idx_t to_write = MIN (left, MAX_CHUNK);
           idx_t written = fwrite (base, sizeof (char), to_write, outfile);
+          process_signals ();
           if (written < to_write)
             return;
           base += written;
           left -= written;
-          process_signals ();
         }
     }
   else
@@ -1108,12 +1109,13 @@ output_1_line (char const *base, char const *limit, char const *flag_format,
               counter_proc_signals = 0;
             }
 
-	  unsigned char c = *t++;
-          switch (c)
+	  switch (*t)
             {
             case '\t':
+	      t++;
 	      do
-		putc (' ', out);
+		if (putc (' ', out) < 0)
+		  return;
 	      while (++column < tab_size);
 
 	      tab++;
@@ -1121,13 +1123,17 @@ output_1_line (char const *base, char const *limit, char const *flag_format,
               break;
 
             case '\r':
-              putc (c, out);
+	      t++;
+	      if (putc ('\r', out) < 0)
+		return;
               if (flag_format && t < limit && *t != '\n')
-                fprintf (out, flag_format, line_flag);
+		if (fprintf (out, flag_format, line_flag) < 0)
+		  return;
               tab = column = 0;
               break;
 
             case '\b':
+	      t++;
 	      if (0 < column)
 		column--;
 	      else if (0 < tab)
@@ -1137,20 +1143,18 @@ output_1_line (char const *base, char const *limit, char const *flag_format,
 		}
 	      else
 		continue;
-              putc (c, out);
+	      if (putc ('\b', out) < 0)
+		return;
               break;
 
-            default:
-	      if (isprint (c))
-		{
-		  column++;
-		  if (column == tab_size)
-		    {
-		      tab++;
-		      column = 0;
-		    }
-		}
-              putc (c, out);
+            default:;
+	      mcel_t g = mcel_scan (t, limit);
+	      column += g.err ? 1 : c32isprint (g.ch) ? c32width (g.ch) : 0;
+	      tab += column / tab_size;
+	      column %= tab_size;
+	      if (fwrite (t, sizeof *t, g.len, outfile) != g.len)
+		return;
+	      t += g.len;
               break;
             }
         }
@@ -1218,7 +1222,7 @@ char const change_letter[] = { '\0', 'd', 'a', 'c' };
    Internal line numbers count from 0 starting after the prefix.
    Actual line numbers count from 1 within the entire file.  */
 
-lin ATTRIBUTE_PURE
+lin
 translate_line_number (struct file_data const *file, lin i)
 {
   return i + file->prefix_lines + 1;
@@ -1310,13 +1314,17 @@ analyze_hunk (struct change *hunk,
           idx_t len = newline - line;
           char const *p = line;
           if (skip_white_space)
-            for (; *p != '\n'; p++)
-              if (! isspace ((unsigned char) *p))
-                {
-                  if (! skip_leading_white_space)
-                    p = line;
-                  break;
-                }
+            while (*p != '\n')
+	      {
+		mcel_t g = mcel_scan (p, newline);
+		if (! c32isspace (g.ch))
+		  {
+		    if (! skip_leading_white_space)
+		      p = line;
+		    break;
+		  }
+		p += g.len;
+	      }
           if (newline - p != trivial_length
               && (! ignore_regexp.fastmap
                   || (re_search (&ignore_regexp, line, len, 0, len, nullptr)
@@ -1332,13 +1340,17 @@ analyze_hunk (struct change *hunk,
           idx_t len = newline - line;
           char const *p = line;
           if (skip_white_space)
-            for (; *p != '\n'; p++)
-              if (! isspace ((unsigned char) *p))
-                {
-                  if (! skip_leading_white_space)
-                    p = line;
-                  break;
-                }
+            while (*p != '\n')
+	      {
+		mcel_t g = mcel_scan (p, newline);
+		if (! c32isspace (g.ch))
+		  {
+		    if (! skip_leading_white_space)
+		      p = line;
+		    break;
+		  }
+		p += g.len;
+	      }
           if (newline - p != trivial_length
               && (! ignore_regexp.fastmap
                   || (re_search (&ignore_regexp, line, len, 0, len, nullptr)

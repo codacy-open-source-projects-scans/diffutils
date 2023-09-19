@@ -70,8 +70,6 @@
 #define _(msgid) gettext (msgid)
 #define N_(msgid) msgid
 
-#include <ctype.h>
-
 #include <errno.h>
 
 #include <signal.h>
@@ -80,7 +78,6 @@
 #endif
 
 #include <attribute.h>
-#include <c-ctype.h>
 #include <idx.h>
 #include <intprops.h>
 #include <minmax.h>

@@ -24,6 +24,7 @@
 #include "paths.h"
 
 #include <binary-io.h>
+#include <c-ctype.h>
 #include <c-stack.h>
 #include <careadlinkat.h>
 #include <diagnose.h>
@@ -1163,7 +1164,7 @@ compare_prepped_files (struct comparison const *parent,
 
   bool toplevel = parent == &noparent;
 
-  /* Comapre the two hierarchies if both files are directories, or if
+  /* Compare the two hierarchies if both files are directories, or if
      diff is recursive and one file is a directory and the other
      pretends to be a directory full of empty files.  But don't
      compare dir contents one level down unless -r was specified.  */
@@ -1487,7 +1488,8 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 
 	      /* If it might be a symlink, play it safe and fstatat later.  */
 	      if (err == ELOOP && no_dereference_symlinks
-		  && (detype[f] == DE_LNK || detype[f] == DE_UNKNOWN))
+		  && (detype[f] == DE_UNKNOWN
+		      || (detype[f] == DE_LNK && accmode == O_RDONLY)))
 		{
 		  fd = UNOPENED;
 		  err = 0;
@@ -1544,21 +1546,31 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 	  if (cmp.file[fnm_arg].desc == STDIN_FILENO)
 	    fatal ("cannot compare '-' to a directory");
 	  char const *fnm = cmp.file[fnm_arg].name;
+	  enum detype dir_detype;
 	  char const *filename = cmp.file[dir_arg].name = free0
-	    = find_dir_file_pathname (&cmp.file[dir_arg], last_component (fnm));
+	    = find_dir_file_pathname (&cmp.file[dir_arg], last_component (fnm),
+				      &dir_detype);
 	  int dirfd = cmp.file[dir_arg].desc;
 	  if (dirfd < 0)
 	    dirfd = AT_FDCWD;
 	  char const *atname = dirfd < 0 ? filename : last_component (filename);
 	  cmp.file[dir_arg].desc = UNOPENED;
 	  noparent.file[dir_arg].desc = dirfd;
-	  cmp.file[dir_arg].desc = openat (dirfd, atname, O_RDONLY | oflags);
+	  cmp.file[dir_arg].desc
+	    = (dir_detype == DE_LNK && no_dereference_symlinks
+	       ? (errno = ELOOP, -1)
+	       : openat (dirfd, atname, O_RDONLY | oflags));
 	  if (O_PATH_DEFINED && cmp.file[dir_arg].desc < 0
+	      && (dir_detype == DE_LNK || dir_detype == DE_UNKNOWN)
 	      && no_dereference_symlinks && errno == ELOOP)
 	    cmp.file[dir_arg].desc = openat (dirfd, atname,
 					     O_PATHSEARCH | oflags);
 	  if (cmp.file[dir_arg].desc < 0
-	      || fstat (cmp.file[dir_arg].desc, &cmp.file[dir_arg].stat) < 0)
+	      ? (O_PATH_DEFINED || !no_dereference_symlinks || errno != ELOOP
+		 || (fstatat (dirfd, atname, &cmp.file[dir_arg].stat,
+			      AT_SYMLINK_NOFOLLOW)
+		     < 0))
+	      : fstat (cmp.file[dir_arg].desc, &cmp.file[dir_arg].stat) < 0)
 	    cmp.file[dir_arg].err = get_errno ();
 	  else
 	    {

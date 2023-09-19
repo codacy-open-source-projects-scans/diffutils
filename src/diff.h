@@ -413,7 +413,8 @@ extern int compare_files (struct comparison const *, enum detype const[2],
 
 /* dir.c */
 extern int diff_dirs (struct comparison *);
-extern char *find_dir_file_pathname (struct file_data *, char const *)
+extern char *find_dir_file_pathname (struct file_data *, char const *,
+				     enum detype *)
   ATTRIBUTE_MALLOC ATTRIBUTE_DEALLOC_FREE
   ATTRIBUTE_RETURNS_NONNULL;
 
@@ -440,8 +441,9 @@ extern void print_sdiff_script (struct change *);
 /* util.c */
 extern char const change_letter[4];
 extern char const pr_program[];
-extern lin translate_line_number (struct file_data const *, lin);
-extern struct change *find_change (struct change *);
+extern lin translate_line_number (struct file_data const *, lin)
+  ATTRIBUTE_PURE;
+extern struct change *find_change (struct change *) ATTRIBUTE_CONST;
 extern enum changes analyze_hunk (struct change *, lin *, lin *, lin *, lin *);
 extern void begin_output (void);
 extern void cleanup_signal_handlers (void);

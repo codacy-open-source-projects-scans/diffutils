@@ -22,6 +22,7 @@
 
 #include "diff.h"
 
+#include <c-ctype.h>
 #include <xmalloca.h>
 
 struct group

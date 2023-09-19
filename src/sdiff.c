@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <unlocked-io.h>
 
+#include <c-ctype.h>
 #include <c-stack.h>
 #include <dirname.h>
 #include <diagnose.h>
@@ -823,7 +824,7 @@ skip_white (void)
   for (;;)
     {
       c = getchar ();
-      if (! isspace (c) || c == '\n')
+      if (! c_isspace (c) || c == '\n')
         break;
       checksigs ();
     }

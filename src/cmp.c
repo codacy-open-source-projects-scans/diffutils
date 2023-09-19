@@ -21,6 +21,7 @@
 #include "paths.h"
 
 #include <binary-io.h>
+#include <c-ctype.h>
 #include <c-stack.h>
 #include <cmpbuf.h>
 #include <diagnose.h>

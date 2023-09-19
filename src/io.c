@@ -26,6 +26,7 @@
 #include <mcel.h>
 #include <xalloc.h>
 
+#include <ctype.h>
 #include <uchar.h>
 
 /* The type of a hash value.  */
