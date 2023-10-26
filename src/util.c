@@ -26,6 +26,7 @@
 #include <error.h>
 #include <flexmember.h>
 #include <mcel.h>
+#include <quotearg.h>
 #include <system-quote.h>
 #include <xalloc.h>
 
@@ -406,8 +407,7 @@ cleanup_signal_handlers (void)
     }
 }
 
-static char const *current_name0;
-static char const *current_name1;
+static char const *current_name[2];
 static bool currently_recursive;
 static bool colors_enabled;
 
@@ -819,8 +819,8 @@ check_color_output (bool is_pipe)
 void
 setup_output (char const *name0, char const *name1, bool recursive)
 {
-  current_name0 = name0;
-  current_name1 = name1;
+  current_name[0] = name0;
+  current_name[1] = name1;
   currently_recursive = recursive;
   outfile = nullptr;
 }
@@ -836,8 +836,12 @@ begin_output (void)
   if (outfile)
     return;
 
-  char const *names[2] = {squote (0, current_name0),
-			  squote (1, current_name1)};
+  char const *names[2];
+  for (int f = 0; f < 2; f++)
+    names[f] = quotearg_n_style (f,
+				 (strchr (current_name[f], ' ')
+				  ? c_quoting_style : c_maybe_quoting_style),
+				 current_name[f]);
 
   /* Construct the header of this piece of diff.  */
   /* POSIX 1003.1-2017 specifies this format.  But there are some bugs in

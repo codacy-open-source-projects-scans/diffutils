@@ -4,19 +4,19 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 ** Improvements
 
-  Programs now quote file names more consistently.
+  Programs now quote file names more consistently in diagnostics.
   For example; "cmp 'none of' /etc/passwd" now might output
   "cmp: EOF on ‘none of’ which is empty" instead of outputting
   "cmp: EOF on none of which is empty".  In diagnostic messages
   that traditionally omit quotes and where backward compatibility
-  seems to be important, programs continue to omit quotes unless they
+  seems to be important, programs continue to omit quotes unless
   a file name contains shell metacharacters, in which case programs
   use shell quoting.  For example, although diff continues to output
   "Only in a: b" as before for most file names, it now outputs
   "Only in 'a: b': 'c: d'" instead of "Only in a: b: c: d" because the
-  file names 'a: b' and 'c: d' contain spaces.  Lastly, diff -c and -u
-  headers now quote file names for the shell when needed, instead of
-  using their own idiosyncratic quoting style.
+  file names 'a: b' and 'c: d' contain spaces.  For compatibility
+  with previous practice, diff -c and -u headers continue to quote for
+  C rather than for the shell.
 
   diff now outputs more information when symbolic links differ, e.g.,
   "Symbolic links ‘d/f’ -> ‘a’ and ‘e/f’ -> ‘b’ differ", not just
