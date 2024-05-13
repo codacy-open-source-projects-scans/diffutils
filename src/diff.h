@@ -25,12 +25,11 @@
 
 _GL_INLINE_HEADER_BEGIN
 
-#ifdef GDIFF_MAIN
-# define DIFF_INLINE _GL_EXTERN_INLINE
-# define XTERN
+#ifdef DIFF_INLINE
+# define DIFF_EXTERN(decl) extern decl; decl
 #else
+# define DIFF_EXTERN(decl) extern decl
 # define DIFF_INLINE _GL_INLINE
-# define XTERN extern
 #endif
 
 /* What kind of changes a hunk contains.  */
@@ -102,24 +101,24 @@ DIFF_INLINE bool robust_output_style (enum output_style s)
   return s != OUTPUT_ED && s != OUTPUT_FORWARD_ED;
 }
 
-XTERN enum output_style output_style;
+DIFF_EXTERN (enum output_style output_style);
 
 /* Define the current color context used to print a line.  */
-XTERN enum colors_style colors_style;
+DIFF_EXTERN (enum colors_style colors_style);
 
 /* Nonzero if output cannot be generated for identical files.  */
-XTERN bool no_diff_means_no_output;
+DIFF_EXTERN (bool no_diff_means_no_output);
 
 /* Number of lines of context to show in each set of diffs.
    This is zero when context is not to be shown.  */
-XTERN lin context;
+DIFF_EXTERN (lin context);
 
 /* Consider all files as text files (-a).
    Don't interpret codes over 0177 as implying a "binary file".  */
-XTERN bool text;
+DIFF_EXTERN (bool text);
 
 /* Number of lines to keep in identical prefix and suffix.  */
-XTERN lin horizon_lines;
+DIFF_EXTERN (lin horizon_lines);
 
 /* The significance of white space during comparisons.  */
 enum DIFF_white_space
@@ -144,107 +143,107 @@ enum DIFF_white_space
   /* Ignore all horizontal white space (-w).  */
   IGNORE_ALL_SPACE
 };
-XTERN enum DIFF_white_space ignore_white_space;
+DIFF_EXTERN (enum DIFF_white_space ignore_white_space);
 
 /* Ignore changes that affect only blank lines (-B).  */
-XTERN bool ignore_blank_lines;
+DIFF_EXTERN (bool ignore_blank_lines);
 
 /* Files can be compared byte-by-byte, as if they were binary.
    This depends on various options.  */
-XTERN bool files_can_be_treated_as_binary;
+DIFF_EXTERN (bool files_can_be_treated_as_binary);
 
 /* Ignore differences in case of letters (-i).  */
-XTERN bool ignore_case;
+DIFF_EXTERN (bool ignore_case);
 
 /* Ignore differences in case of letters in file names.  */
-XTERN bool ignore_file_name_case;
+DIFF_EXTERN (bool ignore_file_name_case);
 
 /* Act on symbolic links themselves rather than on their target
    (--no-dereference).  */
-XTERN bool no_dereference_symlinks;
+DIFF_EXTERN (bool no_dereference_symlinks);
 
 /* Local timezone for 'c' output headers, if needed.  */
 #if HAVE_TM_GMTOFF
 # define localtz 0 /* Placeholder since localtz is never needed.  */
 #else
-XTERN timezone_t localtz;
+DIFF_EXTERN (timezone_t localtz);
 #endif
 
 /* File labels for '-c' output headers (--label).  */
-XTERN char *file_label[2];
+DIFF_EXTERN (char *file_label[2]);
 
 /* Regexp to identify function-header lines (-F).  */
-XTERN struct re_pattern_buffer function_regexp;
+DIFF_EXTERN (struct re_pattern_buffer function_regexp);
 
 /* Ignore changes that affect only lines matching this regexp (-I).  */
-XTERN struct re_pattern_buffer ignore_regexp;
+DIFF_EXTERN (struct re_pattern_buffer ignore_regexp);
 
 /* Say only whether files differ, not how (-q).  */
-XTERN bool brief;
+DIFF_EXTERN (bool brief);
 
 /* Expand tabs in the output so the text lines up properly
    despite the characters added to the front of each line (-t).  */
-XTERN bool expand_tabs;
+DIFF_EXTERN (bool expand_tabs);
 
 /* Number of columns between tab stops.  */
-XTERN intmax_t tabsize;
+DIFF_EXTERN (intmax_t tabsize);
 
 /* Use a tab in the output, rather than a space, before the text of an
    input line, so as to keep the proper alignment in the input line
    without changing the characters in it (-T).  */
-XTERN bool initial_tab;
+DIFF_EXTERN (bool initial_tab);
 
 /* Do not output an initial space or tab before the text of an empty line.  */
-XTERN bool suppress_blank_empty;
+DIFF_EXTERN (bool suppress_blank_empty);
 
 /* Remove trailing carriage returns from input.  */
-XTERN bool strip_trailing_cr;
+DIFF_EXTERN (bool strip_trailing_cr);
 
 /* In directory comparison, specify file to start with (-S).
    This is used for resuming an aborted comparison.
    All file names less than this name are ignored.  */
-XTERN char const *starting_file;
+DIFF_EXTERN (char const *starting_file);
 
 /* Pipe each file's output through pr (-l).  */
-XTERN bool paginate;
+DIFF_EXTERN (bool paginate);
 
 /* Line group formats for unchanged, old, new, and changed groups.  */
-XTERN char const *group_format[CHANGED + 1];
+DIFF_EXTERN (char const *group_format[CHANGED + 1]);
 
 /* Line formats for unchanged, old, and new lines.  */
-XTERN char const *line_format[NEW + 1];
+DIFF_EXTERN (char const *line_format[NEW + 1]);
 
 /* If using OUTPUT_SDIFF print extra information to help the sdiff filter.  */
-XTERN bool sdiff_merge_assist;
+DIFF_EXTERN (bool sdiff_merge_assist);
 
 /* Tell OUTPUT_SDIFF to show only the left version of common lines.  */
-XTERN bool left_column;
+DIFF_EXTERN (bool left_column);
 
 /* Tell OUTPUT_SDIFF to not show common lines.  */
-XTERN bool suppress_common_lines;
+DIFF_EXTERN (bool suppress_common_lines);
 
 /* The half line width and column 2 offset for OUTPUT_SDIFF.  */
-XTERN intmax_t sdiff_half_width;
-XTERN intmax_t sdiff_column2_offset;
+DIFF_EXTERN (intmax_t sdiff_half_width);
+DIFF_EXTERN (intmax_t sdiff_column2_offset);
 
 /* String containing all the command options diff received,
    with spaces between and at the beginning but none at the end.
    If there were no options given, this string is empty.  */
-XTERN char *switch_string;
+DIFF_EXTERN (char *switch_string);
 
 /* Use heuristics for better speed with large files with a small
    density of changes.  */
-XTERN bool speed_large_files;
+DIFF_EXTERN (bool speed_large_files);
 
 /* Patterns that match file names to be excluded.  */
-XTERN struct exclude *excluded;
+DIFF_EXTERN (struct exclude *excluded);
 
 /* Don't discard lines.  This makes things slower (sometimes much
    slower) but will find a guaranteed minimal set of changes.  */
-XTERN bool minimal;
+DIFF_EXTERN (bool minimal);
 
 /* The strftime format to use for time strings.  */
-XTERN char const *time_format;
+DIFF_EXTERN (char const *time_format);
 
 /* The result of comparison is an "edit script": a chain of 'struct change'.
    Each 'struct change' represents one place where some lines are deleted
@@ -384,18 +383,18 @@ struct comparison
 
 /* Describe the two files currently being compared.  */
 
-XTERN struct comparison curr;
+DIFF_EXTERN (struct comparison curr);
 
 /* A placeholder for the parent of the top level comparison.
    Only the desc slots are used; although they are typically AT_FDCWD,
    one might be nonnegative for a directory at the top level
    for 'diff DIR FILE' or 'diff FILE DIR'.  */
 
-XTERN struct comparison noparent;
+DIFF_EXTERN (struct comparison noparent);
 
 /* Stdio stream to output diffs to.  */
 
-XTERN FILE *outfile;
+DIFF_EXTERN (FILE *outfile);
 
 /* Declare various functions.  */
 
@@ -473,7 +472,7 @@ enum color_context
   LINE_NUMBER_CONTEXT,
 };
 
-XTERN bool presume_output_tty;
+DIFF_EXTERN (bool presume_output_tty);
 
 extern void set_color_context (enum color_context color_context);
 extern void set_color_palette (char const *palette);

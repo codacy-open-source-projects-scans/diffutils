@@ -20,7 +20,6 @@
 
 #include <config.h>
 
-#include <count-leading-zeros.h>
 #include <verify.h>
 
 #include <sys/types.h>
@@ -55,6 +54,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <locale.h>
+#include <stdbit.h>
 #include <stdckdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -98,16 +98,16 @@
 #endif
 
 #ifdef SYSTEM_INLINE
-# define SYSTEM_EXTERN
-#else
-# define SYSTEM_EXTERN extern
+# define SYSTEM_EXTERN(decl) extern decl; decl
+# else
+# define SYSTEM_EXTERN(decl) extern decl
 # define SYSTEM_INLINE _GL_INLINE
 #endif
 
 #if (defined __linux__ || defined __CYGWIN__ || defined __FreeBSD__ \
      || defined __NetBSD__ || defined _AIX)
 /* The device number of the /proc file system if known; zero otherwise.  */
-SYSTEM_EXTERN dev_t proc_dev;
+SYSTEM_EXTERN (dev_t proc_dev);
 #endif
 
 /* Use this for code that could be used if diff ever cares about
@@ -117,7 +117,7 @@ SYSTEM_EXTERN dev_t proc_dev;
 #if care_about_symlink_size && (defined __linux__ || defined __ANDROID__)
 # include <sys/utsname.h>
 /* 1 if symlink st_size is OK, -1 if not, 0 if unknown yet.  */
-SYSTEM_EXTERN signed char symlink_size_ok;
+SYSTEM_EXTERN (signed char symlink_size_ok);
 #endif
 
 _GL_INLINE_HEADER_BEGIN
@@ -294,8 +294,10 @@ SYSTEM_INLINE off_t stat_size (struct stat const *s)
 /* Return the floor of the log base 2 of N.  Return -1 if N is zero.  */
 SYSTEM_INLINE int floor_log2 (idx_t n)
 {
-  static_assert (IDX_MAX <= ULLONG_MAX);
-  return ULLONG_WIDTH - 1 - count_leading_zeros_ll (n);
+  static_assert (IDX_MAX <= SIZE_MAX);
+  size_t s = n;
+  int w = stdc_bit_width (s);
+  return w - 1;
 }
 
 _GL_INLINE_HEADER_END
