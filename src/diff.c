@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #define DIFF_INLINE _GL_EXTERN_INLINE
-#define SYSTEM_INLINE _GL_EXTERN_INLINE
 #include "diff.h"
 #include "paths.h"
 
@@ -1647,3 +1646,47 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 
   return status;
 }
+
+/* Define variables declared in diff.h (which see).  */
+FILE *outfile;
+bool brief;
+bool expand_tabs;
+bool files_can_be_treated_as_binary;
+bool ignore_blank_lines;
+bool ignore_case;
+bool ignore_file_name_case;
+bool initial_tab;
+bool left_column;
+bool minimal;
+bool no_dereference_symlinks;
+bool no_diff_means_no_output;
+bool paginate;
+bool presume_output_tty;
+bool sdiff_merge_assist;
+bool speed_large_files;
+bool strip_trailing_cr;
+bool suppress_blank_empty;
+bool suppress_common_lines;
+bool text;
+char *file_label[2];
+char *switch_string;
+char const *group_format[CHANGED + 1];
+char const *line_format[NEW + 1];
+char const *starting_file;
+char const *time_format;
+enum DIFF_white_space ignore_white_space;
+enum colors_style colors_style;
+enum output_style output_style;
+intmax_t sdiff_column2_offset;
+intmax_t sdiff_half_width;
+intmax_t tabsize;
+lin context;
+lin horizon_lines;
+struct comparison curr;
+struct comparison noparent;
+struct exclude *excluded;
+struct re_pattern_buffer function_regexp;
+struct re_pattern_buffer ignore_regexp;
+#ifndef localtz
+timezone_t localtz;
+#endif

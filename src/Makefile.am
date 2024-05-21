@@ -42,12 +42,12 @@ cmp_LDADD = $(LDADD)
 sdiff_LDADD = $(LDADD) $(GETRANDOM_LIB)
 diff3_LDADD = $(LDADD)
 
-cmp_SOURCES = cmp.c
-diff3_SOURCES = diff3.c
-sdiff_SOURCES = sdiff.c
+cmp_SOURCES = cmp.c system.c
+diff3_SOURCES = diff3.c system.c
+sdiff_SOURCES = sdiff.c system.c
 diff_SOURCES = \
   analyze.c context.c diff.c dir.c ed.c ifdef.c io.c \
-  normal.c side.c util.c
+  normal.c side.c system.c util.c
 noinst_HEADERS = diff.h system.h
 
 MOSTLYCLEANFILES = paths.h paths.ht
