@@ -150,7 +150,7 @@ SYSTEM_INLINE int floor_log2 (idx_t n)
 
 _GL_INLINE_HEADER_END
 
-bool same_file (struct stat const *, struct stat const *)
+extern bool same_file (struct stat const *, struct stat const *)
   ATTRIBUTE_PURE;
-off_t stat_size (struct stat const *)
+extern off_t stat_size (struct stat const *)
   ATTRIBUTE_PURE;

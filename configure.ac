@@ -115,6 +115,7 @@ if test $gl_gcc_warnings != no; then
   nw=$ew
   nw="$nw -Winline"                 # not a correctness warning
   nw="$nw -Wstack-protector"        # not a correctness warning
+  nw="$nw -Wsystem-headers"         # Don't let system headers trigger warnings.
 
   gl_MANYWARN_ALL_GCC([ws])
   gl_MANYWARN_COMPLEMENT([ws], [$ws], [$nw])

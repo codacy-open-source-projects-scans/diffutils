@@ -70,8 +70,8 @@ same_file (struct stat const *s, struct stat const *t)
      || defined HAVE_STRUCT_STAT_ST_BIRTHTIMENSEC \
      || (defined _WIN32 && ! defined __CYGWIN__))
   /* If either file has a birth time, comparing them is definitive.  */
-  timespec sbirth = get_stat_birthtime (s);
-  timespec tbirth = get_stat_birthtime (t);
+  struct timespec sbirth = get_stat_birthtime (s);
+  struct timespec tbirth = get_stat_birthtime (t);
   if (0 <= sbirth.tv_nsec || 0 <= tbirth.tv_nsec)
     return timespec_cmp (sbirth, tbirth) == 0;
 #endif

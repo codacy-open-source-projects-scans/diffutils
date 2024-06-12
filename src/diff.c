@@ -1139,6 +1139,20 @@ dir_p (struct comparison const *pcmp, int f)
   return S_ISDIR (pcmp->file[f].stat.st_mode) != 0;
 }
 
+/* If openat with O_NOFOLLOW fails because the file is a symlink,
+   this platform sets errno to NOFOLLOW_SYMLINK_ERRNO.
+   Although POSIX says errno must be ELOOP in that situation,
+   FreeBSD and NetBSD behave more usefully.  */
+enum { NOFOLLOW_SYMLINK_ERRNO =
+#ifdef __FreeBSD__
+	 EMLINK
+#elif defined __NetBSD__
+	 EFTYPE
+#else
+	 ELOOP
+#endif
+};
+
 /* Compare two files with parent comparison PARENT.
    The two files are described by CMP, which has been prepped to contain
    the files' stat results, file types, and possibly descriptors.
@@ -1485,10 +1499,14 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 		    err = 0;
 		}
 
-	      /* If it might be a symlink, play it safe and fstatat later.  */
-	      if (err == ELOOP && no_dereference_symlinks
-		  && (detype[f] == DE_UNKNOWN
-		      || (detype[f] == DE_LNK && accmode == O_RDONLY)))
+	      /* If it is a symlink, fstatat later.  If it might be a
+		 symlink, play it safe and fstatat later.  */
+	      if (err == NOFOLLOW_SYMLINK_ERRNO
+		  && (NOFOLLOW_SYMLINK_ERRNO != ELOOP
+		      || (no_dereference_symlinks
+			  && (detype[f] == DE_UNKNOWN
+			      || (detype[f] == DE_LNK
+				  && accmode == O_RDONLY)))))
 		{
 		  fd = UNOPENED;
 		  err = 0;
@@ -1561,11 +1579,12 @@ compare_files (struct comparison const *parent, enum detype const detype[2],
 	       : openat (dirfd, atname, O_RDONLY | oflags));
 	  if (O_PATH_DEFINED && cmp.file[dir_arg].desc < 0
 	      && (dir_detype == DE_LNK || dir_detype == DE_UNKNOWN)
-	      && no_dereference_symlinks && errno == ELOOP)
+	      && no_dereference_symlinks && errno == NOFOLLOW_SYMLINK_ERRNO)
 	    cmp.file[dir_arg].desc = openat (dirfd, atname,
 					     O_PATHSEARCH | oflags);
 	  if (cmp.file[dir_arg].desc < 0
-	      ? (O_PATH_DEFINED || !no_dereference_symlinks || errno != ELOOP
+	      ? (O_PATH_DEFINED || !no_dereference_symlinks
+		 || errno != NOFOLLOW_SYMLINK_ERRNO
 		 || (fstatat (dirfd, atname, &cmp.file[dir_arg].stat,
 			      AT_SYMLINK_NOFOLLOW)
 		     < 0))

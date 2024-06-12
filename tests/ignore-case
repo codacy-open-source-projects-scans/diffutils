@@ -13,8 +13,8 @@ compare /dev/null out || fail=1
 
 require_utf8_locale_
 
-echo 'AĀȀΆΑАӐḀἈⒶꞺＡ𐐀-Δ' >a
-echo 'aāȁάαаӑḁἀⓐꞻａ𐐨-δ' >b
+echo 'AĀȀΆΑАӐḀἈＡ𐐀-Δ' >a
+echo 'aāȁάαаӑḁἀａ𐐨-δ' >b
 
 diff -i a b >out || fail=1
 compare /dev/null out || fail=1
