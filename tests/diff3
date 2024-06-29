@@ -30,12 +30,14 @@ EOF
 
 fail=0
 
-diff3 a b c > out 2> err || fail=1
+# Use --diff-program=diff since --program-transform-name and similar are
+# applied after 'make install'.
+diff3 --diff-program=diff a b c > out 2> err || fail=1
 compare exp out || fail=1
 compare /dev/null err || fail=1
 
 # Repeat, but with all three files the same:
-diff3 a a a > out 2> err || fail=1
+diff3 --diff-program=diff a a a > out 2> err || fail=1
 compare /dev/null out || fail=1
 compare /dev/null err || fail=1
 
@@ -101,7 +103,7 @@ cat <<'EOF' > exp40 || framework_failure_
   3z
 EOF
 
-diff3 d e f > out 2> err
+diff3 --diff-program=diff d e f > out 2> err
 compare exp40 out || fail=1
 compare /dev/null err || fail=1
 

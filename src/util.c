@@ -411,37 +411,29 @@ static char const *current_name[2];
 static bool currently_recursive;
 static bool colors_enabled;
 
-static struct color_ext_type *color_ext_list = nullptr;
-
 struct bin_str
   {
     idx_t len;			/* Number of bytes */
     const char *string;		/* Pointer to the same */
   };
 
-struct color_ext_type
-  {
-    struct bin_str ext;		/* The extension we're looking for */
-    struct bin_str seq;		/* The sequence to output when we do */
-    struct color_ext_type *next;	/* Next in list */
-  };
-
 /* Parse a string as part of the --palette argument; this may involve
    decoding all kinds of escape characters.  If equals_end is set an
    unescaped equal sign ends the string, otherwise only a : or \0
-   does.  Set *OUTPUT_COUNT to the number of bytes output.  Return
-   true if successful.
+   does.  Return true if successful.
 
    The resulting string is *not* null-terminated, but may contain
    embedded nulls.
+
+   *dest and *src may point into the same string, in which case *dest
+   must not exceed *src and the string is modified in place.
 
    Note that both dest and src are char **; on return they point to
    the first free byte after the array and the character that ended
    the input string, respectively.  */
 
 static bool
-get_funky_string (char **dest, const char **src, bool equals_end,
-                  idx_t *output_count)
+get_funky_string (char **dest, const char **src, bool equals_end)
 {
   enum {
     ST_GND, ST_BACKSLASH, ST_OCTAL, ST_HEX, ST_CARET, ST_END, ST_ERROR
@@ -450,7 +442,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
   char const *p = *src;		/* We don't want to double-indirect */
   char *q = *dest;		/* the whole darn time.  */
 
-  idx_t count = 0;		/* No characters counted in yet.  */
   char num = 0;			/* For numerical codes.  */
 
   while (state < ST_END)
@@ -481,7 +472,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
               FALLTHROUGH;
             default:
               *(q++) = *(p++);
-              ++count;
               break;
             }
           break;
@@ -545,7 +535,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
           if (state == ST_BACKSLASH)
             {
               *(q++) = num;
-              ++count;
               state = ST_GND;
             }
           ++p;
@@ -555,7 +544,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
           if (*p < '0' || *p > '7')
             {
               *(q++) = num;
-              ++count;
               state = ST_GND;
             }
           else
@@ -595,7 +583,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
               break;
             default:
               *(q++) = num;
-              ++count;
               state = ST_GND;
               break;
             }
@@ -606,12 +593,10 @@ get_funky_string (char **dest, const char **src, bool equals_end,
           if (*p >= '@' && *p <= '~')
             {
               *(q++) = *(p++) & 037;
-              ++count;
             }
           else if (*p == '?')
             {
               *(q++) = 127;
-              ++count;
             }
           else
             state = ST_ERROR;
@@ -624,7 +609,6 @@ get_funky_string (char **dest, const char **src, bool equals_end,
 
   *dest = q;
   *src = p;
-  *output_count = count;
 
   return state != ST_ERROR;
 }
@@ -659,10 +643,12 @@ static const char *const indicator_name[] =
   };
 ARGMATCH_VERIFY (indicator_name, color_indicator);
 
-static char const *color_palette;
+static char *color_palette;
 
+/* Set the color palette to PALETTE, a string that set_color_context
+   can modify later.  */
 void
-set_color_palette (char const *palette)
+set_color_palette (char *palette)
 {
   color_palette = palette;
 }
@@ -670,19 +656,16 @@ set_color_palette (char const *palette)
 static void
 parse_diff_color (void)
 {
-  char const *p = color_palette;
+  /* Process color_palette into itself.  This saves a bit of memory,
+     and pacifies Coverity.  The output is no larger than the input.  */
+  char *buf = color_palette;
+  char const *p = buf;
   if (p == nullptr || *p == '\0')
     return;
+  /* Do not process the color palette twice.  */
+  color_palette = nullptr;
 
   char label[] = "??";		/* Indicator label */
-  struct color_ext_type *ext = nullptr;	/* Extension we are working on */
-
-  /* This is an overly conservative estimate, but any possible
-     --palette string will *not* generate a color_buf longer than
-     itself, so it is a safe way of allocating a buffer in
-     advance.  */
-  char *color_buf = xstrdup (p);
-  char *buf = color_buf;
 
   enum parse_state state = PS_START;
   while (true)
@@ -697,20 +680,8 @@ parse_diff_color (void)
               break;
 
             case '*':
-              /* Allocate new extension block and add to head of
-                 linked list (this way a later definition will
-                 override an earlier one, which can be useful for
-                 having terminal-specific defs override global).  */
-
-              ext = xmalloc (sizeof *ext);
-              ext->next = color_ext_list;
-              color_ext_list = ext;
-
               ++p;
-              ext->ext.string = buf;
-
-              state = (get_funky_string (&buf, &p, true, &ext->ext.len)
-                       ? PS_4 : PS_FAIL);
+	      state = get_funky_string (&buf, &p, true) ? PS_4 : PS_FAIL;
               break;
 
             case '\0':
@@ -742,10 +713,13 @@ parse_diff_color (void)
                 {
                   if (STREQ (label, indicator_name[ind_no]))
                     {
-                      color_indicator[ind_no].string = buf;
-                      state = (get_funky_string (&buf, &p, false,
-                                                 &color_indicator[ind_no].len)
-                               ? PS_START : PS_FAIL);
+		      char *str = buf;
+		      if (get_funky_string (&buf, &p, false))
+			{
+			  color_indicator[ind_no].string = str;
+			  color_indicator[ind_no].len = buf - str;
+			  state = PS_START;
+			}
                       break;
                     }
                 }
@@ -755,14 +729,8 @@ parse_diff_color (void)
           break;
 
         case PS_4:		/* Equal sign after *.ext */
-          if (*(p++) == '=')
-            {
-              ext->seq.string = buf;
-              state = (get_funky_string (&buf, &p, false, &ext->seq.len)
-                       ? PS_START : PS_FAIL);
-            }
-          else
-            state = PS_FAIL;
+	  state = (*p++ == '=' && get_funky_string (&buf, &p, false)
+		   ? PS_START : PS_FAIL);
           break;
 
         case PS_FAIL:
@@ -778,13 +746,6 @@ parse_diff_color (void)
     {
       error (0, 0,
              _("unparsable value for --palette"));
-      free (color_buf);
-      for (struct color_ext_type *e = color_ext_list; e != nullptr; )
-        {
-          struct color_ext_type *next = e->next;
-          free (e);
-          e = next;
-        }
       colors_enabled = false;
     }
 }

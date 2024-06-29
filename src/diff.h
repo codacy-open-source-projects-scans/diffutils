@@ -472,6 +472,6 @@ enum color_context
 extern bool presume_output_tty;
 
 extern void set_color_context (enum color_context color_context);
-extern void set_color_palette (char const *palette);
+extern void set_color_palette (char *palette);
 
 _GL_INLINE_HEADER_END
