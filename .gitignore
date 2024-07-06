@@ -113,4 +113,5 @@ src/sdiff
 src/version.[ch]
 tests/*.log
 tests/*.trs
+/tests/init.sh
 vc-dwim-log-*
