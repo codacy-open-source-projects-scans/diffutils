@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Generate a short man page from --help and --version output.
 # Copyright (C) 1997-2005, 2009-2011, 2013, 2015-2024 Free Software Foundation,
@@ -23,6 +23,7 @@
 
 use 5.008;
 use strict;
+use warnings;
 use Getopt::Long;
 use Text::Tabs qw(expand);
 use POSIX qw(strftime setlocale LC_ALL);

@@ -52,7 +52,7 @@ noinst_HEADERS = diff.h system.h
 
 MOSTLYCLEANFILES = paths.h paths.ht
 
-cmp.$(OBJEXT) diff3.$(OBJEXT) diff.$(OBJEXT) sdiff.$(OBJEXT): paths.h
+cmp.$(OBJEXT) diff3.$(OBJEXT) diff.$(OBJEXT) sdiff.$(OBJEXT): paths.h version.h
 
 gdiff = `echo diff|sed '$(transform)'`
 BUILT_SOURCES = paths.h
