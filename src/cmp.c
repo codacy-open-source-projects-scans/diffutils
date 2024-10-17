@@ -370,8 +370,8 @@ main (int argc, char **argv)
 
   idx_t blksize[2];
   for (int f = 0; f < 2; f++)
-    if (STAT_BLOCKSIZE (stat_buf[0]) < 0
-	|| ckd_add (&blksize[f], STAT_BLOCKSIZE (stat_buf[0]), 0))
+    if (ST_BLKSIZE (stat_buf[0]) < 0
+	|| ckd_add (&blksize[f], ST_BLKSIZE (stat_buf[0]), 0))
       blksize[f] = 0;
   buf_size = buffer_lcm (blksize[0], blksize[1], IDX_MAX - sizeof (word));
 

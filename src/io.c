@@ -128,8 +128,8 @@ sip (struct file_data *current, bool skip_test)
   else
     {
       idx_t blksize;
-      if (STAT_BLOCKSIZE (current->stat) < 0
-	  || ckd_add (&blksize, STAT_BLOCKSIZE (current->stat), 0))
+      if (ST_BLKSIZE (current->stat) < 0
+	  || ckd_add (&blksize, ST_BLKSIZE (current->stat), 0))
 	blksize = 0;
       current->bufsize = buffer_lcm (sizeof (word), blksize, IDX_MAX);
       current->buffer = ximalloc (current->bufsize);

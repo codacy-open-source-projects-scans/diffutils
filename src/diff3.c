@@ -1166,8 +1166,8 @@ read_diff (char const *filea,
   struct stat pipestat;
   idx_t current_chunk_size;
   if (fstat (fd, &pipestat) < 0
-      || STAT_BLOCKSIZE (pipestat) <= 0
-      || ckd_add (&current_chunk_size, STAT_BLOCKSIZE (pipestat), 0))
+      || ST_BLKSIZE (pipestat) <= 0
+      || ckd_add (&current_chunk_size, ST_BLKSIZE (pipestat), 0))
     current_chunk_size = 8 * 1024;
   char *diff_result = ximalloc (current_chunk_size);
   idx_t total = 0;

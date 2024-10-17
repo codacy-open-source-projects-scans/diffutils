@@ -480,8 +480,8 @@ diff_2_files (struct comparison *cmp)
           /* Allocate same-sized buffers for both files.  */
           idx_t lcm_max = IDX_MAX - 1, blksize[2];
 	  for (int f = 0; f < 2; f++)
-	    if (STAT_BLOCKSIZE (cmp->file[f].stat) < 0
-		|| ckd_add (&blksize[f], STAT_BLOCKSIZE (cmp->file[f].stat), 0))
+	    if (ST_BLKSIZE (cmp->file[f].stat) < 0
+		|| ckd_add (&blksize[f], ST_BLKSIZE (cmp->file[f].stat), 0))
 	      blksize[f] = 0;
           idx_t buffer_size =
             buffer_lcm (sizeof (word),

@@ -26,16 +26,9 @@
 
 #include <sys/stat.h>
 #include <stat-macros.h>
+#include <stat-size.h>
 #include <stat-time.h>
 #include <timespec.h>
-
-#ifndef STAT_BLOCKSIZE
-# if HAVE_STRUCT_STAT_ST_BLKSIZE
-#  define STAT_BLOCKSIZE(s) ((s).st_blksize)
-# else
-#  define STAT_BLOCKSIZE(s) (8 * 1024)
-# endif
-#endif
 
 #include <unistd.h>
 

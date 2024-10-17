@@ -145,7 +145,6 @@ AC_DEFINE([DEFAULT_EDITOR_PROGRAM], ["ed"],
 AC_PATH_PROG([PR_PROGRAM], [pr], [""])
 AC_DEFINE_UNQUOTED([PR_PROGRAM], ["$PR_PROGRAM"], [Name of "pr" program.])
 
-AC_CHECK_MEMBERS([struct stat.st_blksize])
 AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_HEADER_DIRENT
 AC_HEADER_SYS_WAIT
