@@ -17,7 +17,7 @@ and documents the GNU @command{diff}, @command{diff3},
 differences between files and the GNU @command{patch} command for
 using their output to update files.
 
-Copyright @copyright{} 1992--1994, 1998, 2001--2002, 2004, 2006, 2009--2024
+Copyright @copyright{} 1992--1994, 1998, 2001--2002, 2004, 2006, 2009--2025
 Free Software Foundation, Inc.
 
 @quotation
@@ -4750,13 +4750,14 @@ and @command{patch} should be extended to understand these extensions.
 @subsection File Names that Contain Unusual Characters
 @cindex file names with unusual characters
 
-When a file name contains an unusual character like a newline or
-white space, @samp{diff -r} generates a patch that @command{patch} cannot
-parse.  The problem is with format of @command{diff} output, not just with
-@command{patch}, because with odd enough file names one can cause
-@command{diff} to generate a patch that is syntactically correct but
-patches the wrong files.  The format of @command{diff} output should be
-extended to handle all possible file names.
+Since diffutils-3.3, file names have been encoded to eliminate the ambiguity
+of unusual characters like newline and TAB.
+However, since any file name containing a newline may easily cause trouble,
+in so many contexts (not just diff and patch), a future version of
+diff may well reject attempts to operate on such names.
+@c FIXME-in-2026 consider rejecting NL-afflicted file names
+@c keep an eye on POSIX, e.g.,
+@c https://pubs.opengroup.org/onlinepubs/9799919799/utilities/diff.html
 
 @node Timestamp Order
 @subsection Outputting Diffs in Timestamp Order

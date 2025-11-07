@@ -1,7 +1,7 @@
 /* File I/O for GNU DIFF.
 
    Copyright (C) 1988-1989, 1992-1995, 1998, 2001-2002, 2004, 2006, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This file is part of GNU DIFF.
 
@@ -1012,7 +1012,7 @@ find_and_hash_each_line (struct file_data *current)
 	  linbuf += linbuf_base;
 	  linbuf = xpalloc (linbuf, &n, 1, -1, sizeof *linbuf);
 	  linbuf -= linbuf_base;
-	  alloc_lines = n - linbuf_base;
+	  alloc_lines = linbuf_base + n;
         }
       linbuf[line] = p;
 

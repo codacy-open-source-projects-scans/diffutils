@@ -2,6 +2,21 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+
+* Noteworthy changes in release 3.12 (2025-04-08) [stable]
+
+** Bug fixes
+
+  diff -r no longer merely summarizes when comparing an empty regular
+  file to a nonempty regular file.
+  [bug#76452 introduced in 3.11]
+
+  diff -y no longer crashes when given nontrivial differences.
+  [bug#76613 introduced in 3.11]
+
+
+* Noteworthy changes in release 3.11 (2025-02-02) [stable]
+
 ** Improvements
 
   Programs now quote file names more consistently in diagnostics.
@@ -65,6 +80,10 @@ GNU diffutils NEWS                                    -*- outline -*-
   diff no longer suffers from race conditions in some cases
   when comparing files in a mutating file system.
   [bug present since "the beginning"]
+
+** Release
+
+  distribute gzip-compressed tarballs once again
 
 
 * Noteworthy changes in release 3.10 (2023-05-21) [stable]
@@ -529,7 +548,7 @@ User-visible changes in version 2.0:
 
 
 
-Copyright (C) 1993-1994, 1998, 2001-2002, 2004, 2006, 2009-2013, 2015-2024 Free
+Copyright (C) 1993-1994, 1998, 2001-2002, 2004, 2006, 2009-2013, 2015-2025 Free
 Software Foundation, Inc.
 
 This file is part of GNU Diffutils.

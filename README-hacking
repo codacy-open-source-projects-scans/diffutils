@@ -105,9 +105,21 @@ each program.  One way to do this is to use vc-dwim
   Run the command "git format-patch --stdout -1", and email its output
   in, using the output's subject line.
 
+* Continuous integration
+
+There are two continuous integrations that regularly build and test
+diffutils:
+- On a Linux/glibc system only:
+  https://gitlab.com/gnu-diffutils/ci-distcheck/pipelines
+  https://gitlab.com/gnu-diffutils/ci-distcheck/-/jobs?scope=finished
+  This one will catch only the most blatant mistakes.
+- On many platforms:
+  https://github.com/gnu-diffutils/ci-check/actions
+  This one catches platform-specific bugs.
+
 -----
 
-Copyright (C) 2002-2024 Free Software Foundation, Inc.
+Copyright (C) 2002-2025 Free Software Foundation, Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

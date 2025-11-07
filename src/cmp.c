@@ -1,7 +1,7 @@
 /* GNU cmp - compare two files byte by byte
 
    Copyright (C) 1990-1996, 1998, 2001-2002, 2004, 2006-2007, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include <exitfail.h>
 #include <file-type.h>
 #include <getopt.h>
-#include <hard-locale.h>
 #include <progname.h>
 #include <quote.h>
 #include <unlocked-io.h>
@@ -46,11 +45,15 @@ static char const PROGRAM_NAME[] = "cmp";
   proper_name_lite ("Torbjorn Granlund", "Torbj\303\266rn Granlund"), \
   _("David MacKenzie")
 
+/* Return true if the locale's messages might not be those of C or POSIX.  */
 static bool
 hard_locale_LC_MESSAGES (void)
 {
-#if defined LC_MESSAGES && ENABLE_NLS
-  return hard_locale (LC_MESSAGES);
+#if ENABLE_NLS
+  /* GNU diff defines ENABLE_NLS only if gettext is preinstalled, and
+     on these platforms setlocale (LC_MESSAGES, nullptr) never returns nullptr
+     and always returns "C" when in the C or POSIX locales.  */
+  return !STREQ (setlocale (LC_MESSAGES, nullptr), "C");
 #else
   return false;
 #endif

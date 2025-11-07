@@ -30,19 +30,12 @@ installation.  If you have an older version of libiconv, please
 upgrade to the latest one; see <ftp://ftp.gnu.org/gnu/libiconv/>.  If
 the problem seems isolated to diffutils, though, please report a bug.
 
-This program requires a Standard C compiler (C89 or later).  If you
+This program requires a Standard C compiler (C99 or later).  If you
 have a nonstandard compiler, please install GCC first.
 
 If you make changes to the source code, you may need appropriate
-versions of GNU build tools to regenerate the intermediate files.  The
-following versions were used to generate the intermediate files in
-this distribution:
-
-* Autoconf 2.59   <ftp://ftp.gnu.org/gnu/autoconf/autoconf-2.59.tar.gz>
-* Automake 1.8.3  <ftp://ftp.gnu.org/gnu/automake/automake-1.8.3.tar.gz>
-* gettext 0.14.1  <ftp://ftp.gnu.org/gnu/gettext/gettext-0.14.1.tar.gz>
-* help2man 1.33   <ftp://ftp.gnu.org/gnu/help2man/help2man-1.33.1.tar.gz>
-* Texinfo 4.7     <ftp://ftp.gnu.org/gnu/texinfo/texinfo-4.7.tar.gz>
+versions of GNU build tools to regenerate the intermediate files.
+See README-prereq for details.
 
 For any copyright year range specified as YYYY-ZZZZ in this package
 note that the range specifies every single year in that closed interval.
@@ -51,7 +44,7 @@ Please report bugs to <bug-diffutils@gnu.org>.
 
 -----
 
-Copyright (C) 1992, 1998, 2001-2002, 2004, 2009-2013, 2015-2024 Free Software
+Copyright (C) 1992, 1998, 2001-2002, 2004, 2009-2013, 2015-2025 Free Software
 Foundation, Inc.
 
 This file is part of GNU Diffutils.

@@ -1,6 +1,6 @@
 # Automakefile for GNU diffutils man pages
 
-# Copyright (C) 2002, 2009-2013, 2015-2024 Free Software Foundation, Inc.
+# Copyright (C) 2002, 2009-2013, 2015-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 dist_man1_MANS = cmp.1 diff.1 diff3.1 sdiff.1
-EXTRA_DIST = $(dist_man1_MANS:%.1=%.x) help2man
+EXTRA_DIST = $(dist_man1_MANS:%.1=%.x)
 MAINTAINERCLEANFILES = $(dist_man1_MANS)
 
 S = $(top_srcdir)/src
@@ -29,13 +29,13 @@ sdiff.1: $S/sdiff.c sdiff.x
 # to ensure help2man invokes them via the use of PATH below.
 bin_dir = ../src
 
-# Depend on the former to get version number changes.
-$(dist_man1_MANS): $(SRC_VERSION_C) help2man
+# Depend on $(SRC_VERSION_C) to get version number changes.
+$(dist_man1_MANS): $(SRC_VERSION_C)
 	$(AM_V_GEN)base=`expr $@ : '\(.*\).1'`				\
 	  && test -x $(bin_dir)/$$base					\
 	  && (echo '[NAME]'						\
 	      && sed 's@/\* *@@; s/-/\\-/;s/^GNU //; q' $S/$$base.c)	\
 	     | PATH="$(bin_dir)$(PATH_SEPARATOR)$$PATH"			\
-	       $(srcdir)/help2man -i - -i $(srcdir)/$$base.x		\
+	       $(HELP2MAN) -i - -i $(srcdir)/$$base.x			\
 		 -S '$(PACKAGE) $(VERSION)' $$base > $$base.1-t		\
 	  && mv $$base.1-t $(srcdir)/$$base.1

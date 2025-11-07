@@ -1,7 +1,7 @@
 /* Support routines for GNU DIFF.
 
    Copyright (C) 1988-1989, 1992-1995, 1998, 2001-2002, 2004, 2006, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This file is part of GNU DIFF.
 
@@ -27,31 +27,11 @@
 #include <flexmember.h>
 #include <mcel.h>
 #include <quotearg.h>
+#include <syncsig.h>
 #include <system-quote.h>
 #include <xalloc.h>
 
 #include <stdarg.h>
-#include <signal.h>
-
-/* Use SA_NOCLDSTOP as a proxy for whether the sigaction machinery is
-   present.  */
-#ifndef SA_NOCLDSTOP
-# define SA_NOCLDSTOP 0
-# define sigprocmask(How, Set, Oset) 0
-# if ! HAVE_SIGINTERRUPT
-#  define siginterrupt(sig, flag) 0
-# endif
-#endif
-
-#ifndef SA_RESTART
-# define SA_RESTART 0
-#endif
-#ifndef SIGSTOP
-# define SIGSTOP 0
-#endif
-#ifndef SIGTSTP
-# define SIGTSTP 0
-#endif
 
 char const pr_program[] = PR_PROGRAM;
 
@@ -184,78 +164,9 @@ print_message_queue (void)
       m = next;
     }
 }
-
+
 /* Signal handling, needed for restoring default colors.  */
 
-static void
-xsigaddset (sigset_t *set, int sig)
-{
-  if (sigaddset (set, sig) != 0)
-    pfatal_with_name ("sigaddset");
-}
-
-static bool
-xsigismember (sigset_t const *set, int sig)
-{
-  int mem = sigismember (set, sig);
-  if (mem < 0)
-    pfatal_with_name ("sigismember");
-  assume (mem <= 1);
-  return mem;
-}
-
-typedef void (*signal_handler) (int);
-static signal_handler
-xsignal (int sig, signal_handler func)
-{
-  signal_handler h = signal (sig, func);
-  if (h == SIG_ERR)
-    pfatal_with_name ("signal");
-  return h;
-}
-
-static void
-xsigprocmask (int how, sigset_t const *restrict set, sigset_t *restrict oset)
-{
-  if (sigprocmask (how, set, oset) != 0)
-    pfatal_with_name ("sigprocmask");
-}
-
-/* If true, some signals are caught.  This is separate from
-   'caught_signals' because POSIX doesn't require an all-zero sigset_t
-   to be valid.  */
-static bool some_signals_caught;
-
-/* The set of signals that are caught.  */
-static sigset_t caught_signals;
-
-/* If nonzero, the value of the pending fatal signal.  */
-static sig_atomic_t volatile interrupt_signal;
-
-/* A count of the number of pending stop signals that have been received.  */
-static sig_atomic_t volatile stop_signal_count;
-
-/* An ordinary signal was received; arrange for the program to exit.  */
-
-static void
-sighandler (int sig)
-{
-  if (! SA_NOCLDSTOP)
-    signal (sig, SIG_IGN);
-  if (! interrupt_signal)
-    interrupt_signal = sig;
-}
-
-/* A SIGTSTP was received; arrange for the program to suspend itself.  */
-
-static void
-stophandler (int sig)
-{
-  if (! SA_NOCLDSTOP)
-    signal (sig, stophandler);
-  if (! interrupt_signal)
-    stop_signal_count++;
-}
 /* Process any pending signals.  If signals are caught, this function
    should be called periodically.  Ideally there should never be an
    unbounded amount of time when signals are not being processed.
@@ -265,131 +176,18 @@ stophandler (int sig)
 static void
 process_signals (void)
 {
-  while (interrupt_signal | stop_signal_count)
+  for (int sig; (sig = syncsig_poll ()); )
     {
       set_color_context (RESET_CONTEXT);
       fflush (stdout);
-
-      sigset_t oldset;
-      xsigprocmask (SIG_BLOCK, &caught_signals, &oldset);
-
-      /* Reload stop_signal_count and (if needed) interrupt_signal, in
-	 case a new signal was handled before sigprocmask took effect.  */
-      int stops = stop_signal_count, sig;
-
-      /* SIGTSTP is special, since the application can receive that signal
-         more than once.  In this case, don't set the signal handler to the
-         default.  Instead, just raise the uncatchable SIGSTOP.  */
-      if (stops)
-        {
-          stop_signal_count = stops - 1;
-          sig = SIGSTOP;
-        }
-      else
-	{
-	  sig = interrupt_signal;
-	  xsignal (sig, SIG_DFL);
-	}
-
-      /* Exit or suspend the program.  */
-      if (raise (sig) != 0)
-	pfatal_with_name ("raise");
-      xsigprocmask (SIG_SETMASK, &oldset, nullptr);
-
-      /* If execution reaches here, then the program has been
-         continued (after being suspended).  */
+      syncsig_deliver (sig);
     }
-}
-
-/* The signals that can be caught, the number of such signals,
-   and which of them are actually caught.  */
-static int const sig[] =
-  {
-#if SIGTSTP
-    /* This one is handled specially; see is_tstp_index.  */
-    SIGTSTP,
-#endif
-
-    /* The usual suspects.  */
-#ifdef SIGALRM
-    SIGALRM,
-#endif
-#ifdef SIGHUP
-    SIGHUP,
-#endif
-    SIGINT,
-#ifdef SIGPIPE
-    SIGPIPE,
-#endif
-#ifdef SIGQUIT
-    SIGQUIT,
-#endif
-    SIGTERM,
-#ifdef SIGPOLL
-    SIGPOLL,
-#endif
-#ifdef SIGPROF
-    SIGPROF,
-#endif
-#ifdef SIGVTALRM
-    SIGVTALRM,
-#endif
-#ifdef SIGXCPU
-    SIGXCPU,
-#endif
-#ifdef SIGXFSZ
-    SIGXFSZ,
-#endif
-  };
-enum { nsigs = sizeof (sig) / sizeof *(sig) };
-
-/* True if sig[j] == SIGTSTP.  */
-static bool
-is_tstp_index (int j)
-{
-  return SIGTSTP && j == 0;
 }
 
 static void
 install_signal_handlers (void)
 {
-  if (sigemptyset (&caught_signals) != 0)
-    pfatal_with_name ("sigemptyset");
-
-#if SA_NOCLDSTOP
-  for (int j = 0; j < nsigs; j++)
-    {
-      struct sigaction actj;
-      if (sigaction (sig[j], nullptr, &actj) == 0 && actj.sa_handler != SIG_IGN)
-	xsigaddset (&caught_signals, sig[j]);
-    }
-
-  struct sigaction act;
-  act.sa_mask = caught_signals;
-  act.sa_flags = SA_RESTART;
-
-  for (int j = 0; j < nsigs; j++)
-    if (xsigismember (&caught_signals, sig[j]))
-      {
-	act.sa_handler = is_tstp_index (j) ? stophandler : sighandler;
-	if (sigaction (sig[j], &act, nullptr) != 0)
-	  pfatal_with_name ("sigaction");
-	some_signals_caught = true;
-      }
-#else
-  for (int j = 0; j < nsigs; j++)
-    {
-      signal_handler h = signal (sig[j], SIG_IGN);
-      if (h != SIG_IGN && h != SIG_ERR)
-	{
-	  xsigaddset (&caught_signals, sig[j]);
-	  xsignal (sig[j], is_tstp_index (j) ? stophandler : sighandler);
-	  some_signals_caught = true;
-	  if (siginterrupt (sig[j], 0) != 0)
-	    pfatal_with_name ("siginterrupt");
-	}
-    }
-#endif
+  syncsig_install (SYNCSIG_TSTP);
 }
 
 /* Clean up signal handlers just before exiting the program.  Do this
@@ -398,14 +196,11 @@ install_signal_handlers (void)
 void
 cleanup_signal_handlers (void)
 {
-  if (some_signals_caught)
-    {
-      for (int j = 0; j < nsigs; j++)
-	if (xsigismember (&caught_signals, sig[j]))
-	  xsignal (sig[j], SIG_DFL);
-      process_signals ();
-    }
+  syncsig_uninstall ();
+  process_signals ();
 }
+
+/* Color handling.  */
 
 static char const *current_name[2];
 static bool currently_recursive;

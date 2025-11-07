@@ -1,6 +1,6 @@
 # Configure template for GNU Diffutils.
 
-# Copyright (C) 1994-1995, 1998, 2001-2002, 2004, 2006, 2009-2013, 2015-2024
+# Copyright (C) 1994-1995, 1998, 2001-2002, 2004, 2006, 2009-2013, 2015-2025
 # Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
@@ -28,8 +28,7 @@ AC_CONFIG_SRCDIR([src/diff.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
-AM_INIT_AUTOMAKE([1.11 dist-xz no-dist-gzip subdir-objects
-                       color-tests parallel-tests])
+AM_INIT_AUTOMAKE([1.11 dist-xz subdir-objects color-tests parallel-tests])
 AM_SILENT_RULES([yes]) # make --enable-silent-rules the default.
 
 AC_CONFIG_HEADERS([lib/config.h:lib/config.hin])
@@ -38,6 +37,18 @@ AC_PROG_AWK
 AC_PROG_CC
 AM_MISSING_PROG([HELP2MAN], [help2man])
 AC_PROG_RANLIB
+
+# Do not worry about multibyte C locales.
+# This removes dependencies on hard-locale etc.
+gl_cv_func_mbrtowc_C_locale_sans_EILSEQ="guessing yes"
+gl_cv_func_mbrtoc32_C_locale_sans_EILSEQ="guessing yes"
+
+# Default Gnulib configuration to no multithreading,
+# since diffutils is single-threaded.
+# Although the builder can override this with the --enable-threads option
+# of 'configure', diffutils does not support that on all platforms.
+m4_define([gl_THREADLIB_DEFAULT_NO])
+
 gl_EARLY
 gl_USE_SYSTEM_EXTENSIONS
 gl_INIT
@@ -59,6 +70,51 @@ AC_DEFINE([GNULIB_WCHAR_SINGLE_LOCALE], [1],
 AC_DEFINE([GNULIB_MBRTOC32_REGULAR], [1],
   [Do not worry about rare encodings like CP864, EBCDIC, Johab, and Shift JIS
    that glibc does not support.])
+
+AC_DEFINE([REQUIRE_GNUISH_STRFTIME_AM_PM], [0],
+  [Do not worry about GNU strftime behavior for AM and PM indicators.])
+AC_DEFINE([SUPPORT_NON_GREG_CALENDARS_IN_STRFTIME], [false],
+  [Do not worry about GNU strftime behavior for non-Gregorian calendars.])
+
+# Diffutils translates Gnulib's msgids too.
+AC_DEFINE([GNULIB_TEXT_DOMAIN], [PACKAGE],
+  [Textdomain to use when translating Gnulib's msgids.])
+
+AC_C_INLINE
+
+AC_CHECK_MEMBERS([struct stat.st_rdev])
+AC_HEADER_DIRENT
+AC_HEADER_SYS_WAIT
+AC_TYPE_PID_T
+
+AC_FUNC_FORK
+
+dnl O_PATH exists since Linux 2.6.39, but is supported with fstat() only since
+dnl Linux 3.6. Use a configure test rather than testing `uname -sr`.
+AC_CACHE_CHECK([whether O_PATH supports fstat],
+  [du_cv_O_PATH_fstat],
+  [AC_RUN_IFELSE(
+     [AC_LANG_PROGRAM([[
+        #include <sys/types.h>
+        #include <sys/stat.h>
+        #include <fcntl.h>
+        ]], [[
+        struct stat statbuf;
+        int fd = openat (AT_FDCWD, "conftest.c", O_RDONLY|O_PATH);
+        return !(fd >= 0 && fstat (fd, &statbuf) == 0);
+        ]])
+     ],
+     [du_cv_O_PATH_fstat=yes],
+     [du_cv_O_PATH_fstat=no],
+     [du_cv_O_PATH_fstat="guessing no"])
+  ])
+case "$du_cv_O_PATH_fstat" in
+  yes)
+    AC_DEFINE([O_PATH_SUPPORTS_FSTAT], [1],
+      [Define to 1 if <fcntl.h> defines O_PATH and file descriptors
+       created with this flag are supported by fstat().])
+    ;;
+esac
 
 # gl_GCC_VERSION_IFELSE([major], [minor], [run-if-found], [run-if-not-found])
 # ------------------------------------------------
@@ -137,29 +193,16 @@ if test $gl_gcc_warnings != no; then
   AC_DEFINE([GNULIB_PORTCHECK], [1], [enable some gnulib portability checks])
 fi
 
-AC_C_INLINE
-
 AC_DEFINE([DEFAULT_EDITOR_PROGRAM], ["ed"],
   [Name of editor program, unless overridden.])
 
 AC_PATH_PROG([PR_PROGRAM], [pr], [""])
 AC_DEFINE_UNQUOTED([PR_PROGRAM], ["$PR_PROGRAM"], [Name of "pr" program.])
 
-AC_CHECK_MEMBERS([struct stat.st_rdev])
-AC_HEADER_DIRENT
-AC_HEADER_SYS_WAIT
-AC_TYPE_PID_T
-
-AC_CHECK_FUNCS_ONCE([sigaction sigprocmask])
-if test $ac_cv_func_sigprocmask = no; then
-  AC_CHECK_FUNCS([sigblock])
-fi
-AC_FUNC_FORK
-
 # When .tarball-version exists, we're building from a tarball
 # and must not make man/*.1 files depend on the generated src/version.c,
-# because that would induce a requirement to run the help2man perl script.
-# We are not yet prepared to make perl a build-from-tarball requirement.
+# because that would induce a requirement to run help2man.
+# We are not yet prepared to make help2man a build-from-tarball requirement.
 # Hence, here we detect .tarball-version existence.  When not present,
 # we define a variable to be used in man/Makefile.am to induce the
 # proper dependency (so that man/*.1 will be rebuilt upon any version change),
@@ -169,7 +212,7 @@ test -f $srcdir/.tarball-version \
   && SRC_VERSION_C= \
   || SRC_VERSION_C=../src/version.c
 
-AM_GNU_GETTEXT([external], [need-ngettext])
+AM_GNU_GETTEXT([external], [need-formatstring-macros])
 AM_GNU_GETTEXT_VERSION([0.19.2])
 XGETTEXT="AWK='$AWK' \$(SHELL) \$(top_srcdir)/exgettext $XGETTEXT"
 

@@ -1,7 +1,7 @@
 /* GNU sdiff - side-by-side merge of file differences
 
    Copyright (C) 1992-1996, 1998, 2001-2002, 2004, 2006-2007, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This file is part of GNU DIFF.
 
@@ -100,7 +100,9 @@ enum
 typedef void (*sighandler) (int);
 static void signal_handler (int, sighandler);
 
-#if HAVE_SIGACTION
+/* Use SA_NOCLDSTOP as a proxy for whether the sigaction machinery is
+   present.  */
+#ifdef SA_NOCLDSTOP
 /* Prefer 'sigaction' if available, since 'signal' can lose signals.  */
 static struct sigaction initial_action[NUM_SIGS];
 static sighandler
@@ -714,21 +716,21 @@ static bool sigs_trapped;
 static void
 catchsig (int s)
 {
-#if ! HAVE_SIGACTION
+#ifndef SA_NOCLDSTOP
   signal (s, SIG_IGN);
 #endif
   if (! (s == SIGINT && ignore_SIGINT))
     signal_received = s;
 }
 
-#if HAVE_SIGACTION
+#ifdef SA_NOCLDSTOP
 static struct sigaction catchaction;
 #endif
 
 static void
 signal_handler (int sig, sighandler handler)
 {
-#if HAVE_SIGACTION
+#ifdef SA_NOCLDSTOP
   catchaction.sa_handler = handler;
   sigaction (sig, &catchaction, 0);
 #else
@@ -739,7 +741,7 @@ signal_handler (int sig, sighandler handler)
 static void
 trapsigs (void)
 {
-#if HAVE_SIGACTION
+#ifdef SA_NOCLDSTOP
   catchaction.sa_flags = SA_RESTART;
   sigemptyset (&catchaction.sa_mask);
   for (int i = 0;  i < NUM_SIGS;  i++)
@@ -748,7 +750,7 @@ trapsigs (void)
 
   for (int i = 0;  i < NUM_SIGS;  i++)
     {
-#if HAVE_SIGACTION
+#ifdef SA_NOCLDSTOP
       sigaction (sigs[i], nullptr, &initial_action[i]);
 #else
       initial_action[i] = signal (sigs[i], SIG_IGN);
@@ -773,7 +775,7 @@ untrapsig (int s)
     for (int i = 0;  i < NUM_SIGS;  i++)
       if ((! s || sigs[i] == s)  &&  initial_handler (i) != SIG_IGN)
         {
-#if HAVE_SIGACTION
+#ifdef SA_NOCLDSTOP
           sigaction (sigs[i], &initial_action[i], nullptr);
 #else
           signal (sigs[i], initial_action[i]);
@@ -802,7 +804,7 @@ checksigs (void)
 static void
 give_help (void)
 {
-  fprintf (stderr, "%s", _("\
+  fputs (_("\
 ed:\tEdit then use both versions, each decorated with a header.\n\
 eb:\tEdit then use both versions.\n\
 el or e1:\tEdit then use the left version.\n\
@@ -813,20 +815,15 @@ r or 2:\tUse the right version.\n\
 s:\tSilently include common lines.\n\
 v:\tVerbosely include common lines.\n\
 q:\tQuit.\n\
-"));
+"), stderr);
 }
 
 static int
 skip_white (void)
 {
   int c;
-  for (;;)
-    {
-      c = getchar ();
-      if (! c_isspace (c) || c == '\n')
-        break;
-      checksigs ();
-    }
+  while ((c = getchar ()) != '\n' && c_isspace (c))
+    checksigs ();
   if (ferror (stdin))
     perror_fatal (_("read failed"));
   return c;
@@ -856,8 +853,7 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
 {
   for (;;)
     {
-      int cmd0;
-      int cmd1;
+      int cmd;
       bool gotcmd = false;
 
       while (! gotcmd)
@@ -866,48 +862,41 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
             perror_fatal (_("write failed"));
           ck_fflush (stdout);
 
-          cmd0 = skip_white ();
-          switch (cmd0)
+	  cmd = skip_white ();
+          switch (cmd)
             {
-            case '1': case '2': case 'l': case 'r':
-            case 's': case 'v': case 'q':
-              if (skip_white () != '\n')
-                {
-                  give_help ();
-                  flush_line ();
-                  continue;
-                }
-              gotcmd = true;
-              break;
-
-            case 'e':
-              cmd1 = skip_white ();
+	    case 'e':;
+	      int cmd1 = skip_white ();
               switch (cmd1)
                 {
-                case '1': case '2': case 'b': case 'd': case 'l': case 'r':
-                  if (skip_white () != '\n')
-                    {
-                      give_help ();
-                      flush_line ();
-                      continue;
-                    }
-                  gotcmd = true;
-                  break;
                 case '\n':
                   gotcmd = true;
-                  break;
+		  continue;
                 default:
                   give_help ();
                   flush_line ();
-                  continue;
+		  continue;
+		case '1': case '2': case 'b': case 'd': case 'l': case 'r':
+		  cmd |= cmd1 << UCHAR_WIDTH;
+		  break;
                 }
+	      FALLTHROUGH;
+	    case '1': case '2': case 'l': case 'r':
+	    case 's': case 'v': case 'q':
+	      if (skip_white () == '\n')
+		gotcmd = true;
+	      else
+		{
+		  give_help ();
+		  flush_line ();
+		}
               break;
 
             case EOF:
               if (feof (stdin))
                 {
                   gotcmd = true;
-                  cmd0 = 'q';
+                  cmd = 'q';
                   break;
                 }
               FALLTHROUGH;
@@ -916,11 +905,11 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
               FALLTHROUGH;
             case '\n':
               give_help ();
-              continue;
+	      break;
             }
         }
 
-      switch (cmd0)
+      switch (cmd & UCHAR_MAX)
         {
         case '1': case 'l':
           lf_copy (left, llen, outfile);
@@ -953,6 +942,7 @@ edit (struct line_filter *left, char const *lname, lin lline, lin llen,
           if (! tmp)
 	    perror_fatal (squote (0, tmpname));
 
+	  int cmd1 = cmd >> UCHAR_WIDTH;
           switch (cmd1)
             {
             case 'd':

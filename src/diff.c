@@ -1,7 +1,7 @@
 /* GNU diff - compare files line by line
 
    Copyright (C) 1988-1989, 1992-1994, 1996, 1998, 2001-2002, 2004, 2006-2007,
-   2009-2013, 2015-2024 Free Software Foundation, Inc.
+   2009-2013, 2015-2025 Free Software Foundation, Inc.
 
    This file is part of GNU DIFF.
 
@@ -35,7 +35,7 @@
 #include <filenamecat.h>
 #include <fnmatch.h>
 #include <getopt.h>
-#include <hard-locale.h>
+#include <strftime.h>
 #include <progname.h>
 #include <quote.h>
 #include <sh-quote.h>
@@ -102,8 +102,9 @@ static bool binary;
 enum { binary = true };
 #endif
 
-/* Use Linux-style O_PATH if available, POSIX-style O_SEARCH otherwise.  */
-#ifdef O_PATH
+/* Use Linux-style O_PATH if available and supported by fstat(),
+   POSIX-style O_SEARCH otherwise.  */
+#if O_PATH_SUPPORTS_FSTAT
 enum { O_PATH_DEFINED = true };
 enum { O_PATHSEARCH = O_PATH };
 #else
@@ -291,6 +292,21 @@ static int
 exclude_options (void)
 {
   return EXCLUDE_WILDCARDS | (ignore_file_name_case ? FNM_CASEFOLD : 0);
+}
+
+/* Return true if in a hard LC_TIME locale.  */
+static bool
+hard_locale_LC_TIME (void)
+{
+  /* Use the heuristic that %c has its usual POSIX meaning.
+     This is good enough in practice.  */
+  static struct tm const tm
+    = { .tm_year = 1970 - 1900, .tm_mon = 0, .tm_mday = 1,
+	.tm_hour = 23, .tm_min = 59, .tm_sec = 59 };
+  static char const expected[] = "Thu Jan  1 23:59:59 1970";
+  char buf[sizeof expected];
+  return (nstrftime (buf, sizeof buf, "%c", &tm, 0, 0) == sizeof buf - 1
+	  && memcmp (buf, expected, sizeof buf) == 0);
 }
 
 int
@@ -745,7 +761,7 @@ main (int argc, char **argv)
         specify_style (OUTPUT_NORMAL);
     }
 
-  if (output_style != OUTPUT_CONTEXT || hard_locale (LC_TIME))
+  if (output_style != OUTPUT_CONTEXT || hard_locale_LC_TIME ())
     {
 #if defined STAT_TIMESPEC || defined STAT_TIMESPEC_NS
       time_format = "%Y-%m-%d %H:%M:%S.%N %z";
@@ -1073,11 +1089,10 @@ Mandatory arguments to long options are mandatory for short options too.\n\
 
   for (char const *const *p = option_help_msgid;  *p;  p++)
     {
-      if (!**p)
-        putchar ('\n');
-      else
+      char const *msg = *p;
+      if (*msg)
         {
-          char const *msg = _(*p);
+	  msg = gettext (msg);
 	  for (char const *nl; (nl = strchr (msg, '\n')); msg = nl + 1)
             {
 	      fputs ("  ", stdout);
@@ -1086,8 +1101,8 @@ Mandatory arguments to long options are mandatory for short options too.\n\
 
 	  if (*msg == ' ' || *msg == '-')
 	    fputs ("  ", stdout);
-	  puts (msg);
         }
+      puts (msg);
     }
   emit_bug_reporting_address ();
 }
@@ -1221,14 +1236,14 @@ compare_prepped_files (struct comparison const *parent,
      the type is unusual, then simply report their type.
      However, at the top level do this only if one file is a symlink
      and the other is not.  */
-  if (toplevel
-      ? (!S_ISLNK (cmp->file[0].stat.st_mode)
-	 != !S_ISLNK (cmp->file[1].stat.st_mode))
-      : (cmp->file[0].filetype != cmp->file[1].filetype
-	 || ! (S_ISREG (cmp->file[0].stat.st_mode)
-	       || S_ISLNK (cmp->file[0].stat.st_mode)
-	       || S_ISCHR (cmp->file[0].stat.st_mode)
-	       || S_ISBLK (cmp->file[0].stat.st_mode))))
+  mode_t mode0 = cmp->file[0].stat.st_mode;
+  mode_t mode1 = cmp->file[1].stat.st_mode;
+  if (toplevel ? !S_ISLNK (mode0) != !S_ISLNK (mode1)
+      : S_ISREG (mode0) ? !S_ISREG (mode1)
+      : S_ISLNK (mode0) ? !S_ISLNK (mode1)
+      : S_ISCHR (mode0) ? !S_ISCHR (mode1)
+      : S_ISBLK (mode0) ? !S_ISBLK (mode1)
+      : true)
     {
       /* POSIX 1003.1-2017 says any message will do, so long as it
 	 contains the file names.  */
@@ -1242,7 +1257,7 @@ compare_prepped_files (struct comparison const *parent,
     }
 
   /* If both files are symlinks, compare symlink contents.  */
-  if (S_ISLNK (cmp->file[0].stat.st_mode))
+  if (S_ISLNK (mode0))
     {
       /* We get here only if we are not dereferencing symlinks.  */
       dassert (no_dereference_symlinks);
@@ -1293,7 +1308,7 @@ compare_prepped_files (struct comparison const *parent,
      and report file types of all other non-regular files.
      POSIX 1003.1-2017 says any message will do,
      so long as it contains the file names.  */
-  if (!toplevel && !S_ISREG (cmp->file[0].stat.st_mode))
+  if (!toplevel && !S_ISREG (mode0))
     {
       if (cmp->file[0].stat.st_rdev == cmp->file[1].stat.st_rdev)
 	return EXIT_SUCCESS;
@@ -1309,7 +1324,7 @@ compare_prepped_files (struct comparison const *parent,
       for (int i = 0; i < n_num; i++)
 	sprintf (numbuf[i], "%"PRIdMAX, num[i]);
 
-      message ((S_ISCHR (cmp->file[0].stat.st_mode)
+      message ((S_ISCHR (mode0)
 		? ("Character special files %s (%s, %s)"
 		   " and %s (%s, %s) differ\n")
 		: ("Block special files %s (%s, %s)"
@@ -1321,8 +1336,8 @@ compare_prepped_files (struct comparison const *parent,
     }
 
   if (files_can_be_treated_as_binary
-      && S_ISREG (cmp->file[0].stat.st_mode)
-      && S_ISREG (cmp->file[1].stat.st_mode)
+      && S_ISREG (mode0)
+      && S_ISREG (mode1)
       && cmp->file[0].stat.st_size != cmp->file[1].stat.st_size
       && 0 <= cmp->file[0].stat.st_size
       && 0 <= cmp->file[1].stat.st_size)

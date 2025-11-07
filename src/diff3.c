@@ -1,7 +1,7 @@
 /* GNU diff3 - compare three files line by line
 
    Copyright (C) 1988-1989, 1992-1996, 1998, 2001-2002, 2004, 2006, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1314,33 +1314,33 @@ output_diff3 (FILE *outputfile, struct diff3_block *diff,
            i = (oddoneout == 1 ? skew_increment[i] : i + 1))
         {
           int realfile = mapping[i];
-          lin lowt = D_LOWLINE (ptr, realfile);
-          lin hight = D_HIGHLINE (ptr, realfile);
+          lin low_t = D_LOWLINE (ptr, realfile);
+          lin high_t = D_HIGHLINE (ptr, realfile);
 
           fprintf (outputfile, "%d:", i + 1);
-          switch (lowt - hight)
+          switch (low_t - high_t)
             {
             case 1:
-              fprintf (outputfile, "%"pI"da\n", lowt - 1);
+              fprintf (outputfile, "%"pI"da\n", low_t - 1);
               break;
             case 0:
-              fprintf (outputfile, "%"pI"dc\n", lowt);
+              fprintf (outputfile, "%"pI"dc\n", low_t);
               break;
             default:
-              fprintf (outputfile, "%"pI"d,%"pI"dc\n", lowt, hight);
+              fprintf (outputfile, "%"pI"d,%"pI"dc\n", low_t, high_t);
               break;
             }
 
           if (i == dontprint) continue;
 
-          if (lowt <= hight)
+          if (low_t <= high_t)
             for (lin line = 0; ; line++)
               {
                 fputs (line_prefix, outputfile);
                 char *cp = D_RELNUM (ptr, realfile, line);
                 idx_t length = D_RELLEN (ptr, realfile, line);
                 fwrite (cp, sizeof (char), length, outputfile);
-                if (hight - lowt <= line)
+                if (high_t - low_t <= line)
                   {
                     if (cp[length - 1] != '\n')
                       fprintf (outputfile, "\n\\ %s\n",

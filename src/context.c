@@ -1,7 +1,7 @@
 /* Context-format output routines for GNU DIFF.
 
    Copyright (C) 1988-1989, 1991-1995, 1998, 2001-2002, 2004, 2006, 2009-2013,
-   2015-2024 Free Software Foundation, Inc.
+   2015-2025 Free Software Foundation, Inc.
 
    This file is part of GNU DIFF.
 
@@ -72,7 +72,8 @@ print_context_label (char const *mark,
 
       struct tm const *tm = localtime (&ts.tv_sec);
       int nsec = ts.tv_nsec;
-      if (tm && nstrftime (buf, sizeof buf, time_format, tm, localtz, nsec))
+      if (tm
+	  && 0 <= nstrftime (buf, sizeof buf, time_format, tm, localtz, nsec))
 	fprintf (outfile, "%s %s\t%s", mark, name, buf);
       else if (TYPE_SIGNED (time_t))
         {

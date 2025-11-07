@@ -1,5 +1,5 @@
 # Customize maint.mk                           -*- makefile -*-
-# Copyright (C) 2003-2013, 2015-2024 Free Software Foundation, Inc.
+# Copyright (C) 2003-2013, 2015-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,11 +36,14 @@ announcement_Cc_ = $(translation_project_), $(PACKAGE)-devel@gnu.org
 # Now that we have better tests, make this the default.
 export VERBOSE = yes
 
-old_NEWS_hash = d6a8096805f9b3ee162842058477f0bc
+old_NEWS_hash = cfdcec044a361bf0e7b4e860bacc3d53
 
 # Tell maint.mk's syntax-check rules that diff gets config.h directly or
 # via diff.h or system.h.
 config_h_header = (<config\.h>|"(diff|system)\.h")
+
+# Write base64-encoded (not hex) checksums into the announcement.
+announce_gen_args = --cksum-checksums
 
 # Add an exemption for sc_makefile_at_at_check.
 _makefile_at_at_check_exceptions = ' && !/MAKEINFO/'
@@ -82,3 +85,5 @@ exclude_file_name_regexp--sc_prohibit_strcmp = ^gl/lib/
 # Tell gnulib's tight_scope rule that we mark extern inlines with
 # DIFF_INLINE and SYSTEM_INLINE.
 export _gl_TS_extern = extern|DIFF_INLINE|SYSTEM_INLINE
+
+codespell_ignore_words_list = FO,ND,debbugs

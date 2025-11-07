@@ -9,6 +9,7 @@ TESTS = \
   cmp \
   colliding-file-names \
   diff3 \
+  empty-file \
   excess-slash \
   expand-tabs \
   help-version	\
@@ -24,6 +25,7 @@ TESTS = \
   no-dereference \
   no-newline-at-eof \
   side-by-side \
+  side-by-side-seq \
   starting-file \
   stdin \
   strcoll-0-names \
