@@ -4016,7 +4016,7 @@ found.  @xref{Comparing Directories}.
 
 @item -s
 @itemx --report-identical-files
-Report when two files are the same.  @xref{Comparing Directories}.
+Also report when two files are the same.  @xref{Comparing Directories}.
 
 @item -S @var{file}
 @itemx --starting-file=@var{file}

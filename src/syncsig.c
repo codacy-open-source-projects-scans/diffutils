@@ -214,8 +214,8 @@ sighandler (int sig)
 void
 syncsig_install (int flags)
 {
-  for (int i = 0; i < countof (signal_count); i++)
-    signal_count[i] = 0;
+  for (int i = 0; i < countof (catchable); i++)
+    signal_count[catchable[i]] = 0;
   possible_signal_count = false;
 
   sigemptyset (&caught_signals);

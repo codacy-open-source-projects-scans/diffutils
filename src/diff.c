@@ -980,8 +980,8 @@ check_stdout (void)
 
 static char const *const option_help_msgid[] = {
   N_("    --normal                  output a normal diff (the default)"),
-  N_("-q, --brief                   report only when files differ"),
-  N_("-s, --report-identical-files  report when two files are the same"),
+  N_("-q, --brief                   report only whether files differ"),
+  N_("-s, --report-identical-files  also report if two files are the same"),
   N_("-c, -C NUM, --context[=NUM]   output NUM (default 3) lines of copied context"),
   N_("-u, -U NUM, --unified[=NUM]   output NUM (default 3) lines of unified context"),
   N_("-e, --ed                      output an ed script"),
