@@ -2,6 +2,13 @@ GNU diffutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Bug fixes
+
+  diff3 no longer has undefined behavior if the underlying diff
+  program produces incorrect command lines, or enormous line numbers,
+  or unexpectedly truncated data.
+  [bugs present since "the beginning"]
+
 
 * Noteworthy changes in release 3.12 (2025-04-08) [stable]
 

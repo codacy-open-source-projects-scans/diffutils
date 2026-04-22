@@ -237,7 +237,7 @@ get_funky_string (char **dest, const char **src, bool equals_end)
   char const *p = *src;		/* We don't want to double-indirect */
   char *q = *dest;		/* the whole darn time.  */
 
-  char num = 0;			/* For numerical codes.  */
+  unsigned char num = 0;	/* For numerical codes.  */
 
   while (state < ST_END)
     {
@@ -342,7 +342,12 @@ get_funky_string (char **dest, const char **src, bool equals_end)
               state = ST_GND;
             }
           else
-            num = (num << 3) + (*(p++) - '0');
+	    {
+	      int digit = *p - '0';
+	      if (ckd_mul (&num, num, 8) || ckd_add (&num, num, digit))
+		state = ST_ERROR;
+	      p++;
+	    }
           break;
 
         case ST_HEX:		/* Hex sequence */
@@ -358,7 +363,12 @@ get_funky_string (char **dest, const char **src, bool equals_end)
             case '7':
             case '8':
             case '9':
-              num = (num << 4) + (*(p++) - '0');
+	      {
+		int digit = *p - '0';
+		if (ckd_mul (&num, num, 16) || ckd_add (&num, num, digit))
+		  state = ST_ERROR;
+		p++;
+	      }
               break;
             case 'a':
             case 'b':
@@ -366,7 +376,12 @@ get_funky_string (char **dest, const char **src, bool equals_end)
             case 'd':
             case 'e':
             case 'f':
-              num = (num << 4) + (*(p++) - 'a') + 10;
+	      {
+		int digit = *p - 'a' + 10;
+		if (ckd_mul (&num, num, 16) || ckd_add (&num, num, digit))
+		  state = ST_ERROR;
+		p++;
+	      }
               break;
             case 'A':
             case 'B':
@@ -374,7 +389,12 @@ get_funky_string (char **dest, const char **src, bool equals_end)
             case 'D':
             case 'E':
             case 'F':
-              num = (num << 4) + (*(p++) - 'A') + 10;
+	      {
+		int digit = *p - 'A' + 10;
+		if (ckd_mul (&num, num, 16) || ckd_add (&num, num, digit))
+		  state = ST_ERROR;
+		p++;
+	      }
               break;
             default:
               *(q++) = num;

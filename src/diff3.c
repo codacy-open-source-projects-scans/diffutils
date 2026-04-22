@@ -1019,10 +1019,17 @@ readnum (char *s, lin *pnum)
 
   do
     {
-      num = c - '0' + num * 10;
+      if (ckd_mul (&num, num, 10) || ckd_add (&num, num, c - '0'))
+        return nullptr;
       c = *++s;
     }
   while (c_isdigit (c));
+
+  /* Simplify overflow checking later, so that we can always add a
+     line number and a line count, or subtract two line numbers and
+     add 1 to the result, without worrying about overflow.  */
+  if (LIN_MAX / 2 < num)
+    return nullptr;
 
   *pnum = num;
   return s;
@@ -1053,11 +1060,12 @@ process_diff_control (char **string, struct diff_block *db)
 
   /* Was that the only digit? */
   s = skipwhite (s);
-  if (*s == ',')
+  bool saw_comma = *s == ',';
+  if (saw_comma)
     {
       s = readnum (s + 1, &db->ranges[0][RANGE_END]);
-      if (! s)
-        return DIFF_ERROR;
+      if (! s || db->ranges[0][RANGE_END] < db->ranges[0][RANGE_START])
+	return DIFF_ERROR;
     }
   else
     db->ranges[0][RANGE_END] = db->ranges[0][RANGE_START];
@@ -1068,6 +1076,8 @@ process_diff_control (char **string, struct diff_block *db)
   switch (*s)
     {
     case 'a':
+      if (saw_comma)
+	return DIFF_ERROR;
       type = DIFF_ADD;
       break;
     case 'c':
@@ -1235,6 +1245,9 @@ static char *
 scan_diff_line (char *scan_ptr, char **set_start, idx_t *set_length,
                 char *limit, char leadingchar)
 {
+  if (limit - scan_ptr < sizeof "< \n" - 1)
+    fatal ("invalid diff format; hunk truncated");
+
   if (!(scan_ptr[0] == leadingchar
         && scan_ptr[1] == ' '))
     fatal ("invalid diff format; incorrect leading line chars");
